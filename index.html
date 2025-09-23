@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>e-Counseling - SMAN 1 Dramaga</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --c-primary: #4f46e5;
+            --c-primary-dark: #4338ca;
+            --c-bg-app: #f3f4f6;
+            --c-bg-card: #ffffff;
+            --c-text-main: #1f2937;
+            --c-text-muted: #6b7280;
+            --c-text-on-primary: #ffffff;
+            --c-border: #d1d5db;
+            --c-bubble-sent-bg: #4f46e5;
+            --c-bubble-sent-text: #ffffff;
+            --c-bubble-received-bg: #e5e7eb;
+            --c-bubble-received-text: #1f2937;
+            --c-login-grad-from: #3b82f6;
+            --c-login-grad-to: #6366f1;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--c-bg-app);
+            color: var(--c-text-main);
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .modal-backdrop {
+            background-color: rgba(0,0,0,0.5);
+        }
+        /* Custom classes using CSS variables */
+        .bg-primary { background-color: var(--c-primary); }
+        .text-primary { color: var(--c-primary); }
+        .text-on-primary { color: var(--c-text-on-primary); }
+        .hover\:bg-primary-dark:hover { background-color: var(--c-primary-dark); }
+        .focus\:ring-primary:focus { --tw-ring-color: var(--c-primary); }
+        .focus\:border-primary:focus { border-color: var(--c-primary); }
+        
+        .bg-card { background-color: var(--c-bg-card); }
+        .text-main { color: var(--c-text-main); }
+        .text-muted { color: var(--c-text-muted); }
+        .border-main { border-color: var(--c-border); }
+
+        .bubble-sent { background-color: var(--c-bubble-sent-bg); color: var(--c-bubble-sent-text); }
+        .bubble-received { background-color: var(--c-bubble-received-bg); color: var(--c-bubble-received-text); }
+        .login-gradient { background-image: linear-gradient(to bottom right, var(--c-login-grad-from), var(--c-login-grad-to)); }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div id="app" class="max-w-7xl mx-auto min-h-screen transition-all duration-500">
+        <!-- Halaman akan dirender di sini oleh JS -->
+    </div>
+    
+    <audio id="counseling-music" loop></audio>
+
+    <script>
+        // === TRANSLATION & THEME MANAGEMENT ===
+        const translations = {
+            app_title: { id: 'e-Counseling', en: 'e-Counseling' },
+            app_subtitle: { id: 'Platform Konseling Siswa Digital', en: 'Digital Student Counseling Platform' },
+            school_name: { id: 'SMAN 1 DRAMAGA', en: 'SMAN 1 DRAMAGA' },
+            full_name: { id: 'Nama Lengkap', en: 'Full Name' },
+            enter_your_name: { id: 'Masukkan nama Anda', en: 'Enter your name' },
+            login_as_student: { id: 'Masuk sebagai Siswa', en: 'Login as Student' },
+            login_as_counselor: { id: 'Masuk sebagai Konselor', en: 'Login as Counselor' },
+            login_button: { id: 'Masuk', en: 'Login' },
+            name_required: { id: 'Nama atau pilihan tidak boleh kosong.', en: 'Name or selection cannot be empty.' },
+            password: { id: 'Kata Sandi', en: 'Password' },
+            enter_password: { id: 'Masukkan kata sandi', en: 'Enter password' },
+            password_incorrect: { id: 'Kata sandi salah.', en: 'Incorrect password.' },
+            role_student: { id: 'Siswa', en: 'Student' },
+            role_counselor: { id: 'Konselor', en: 'Counselor' },
+            your_consultation_history: { id: 'Riwayat Konsultasi Anda', en: 'Your Consultation History' },
+            create_new_consultation: { id: 'Buat Konsultasi Baru', en: 'Create New Consultation' },
+            no_consultation_yet: { id: 'Belum Ada Konsultasi', en: 'No Consultation Yet' },
+            no_consultation_desc: { id: 'Klik "Buat Konsultasi Baru" untuk memulai sesi dengan konselor.', en: 'Click "Create New Consultation" to start a session with a counselor.' },
+            student_consultation_list: { id: 'Daftar Konsultasi Siswa', en: 'Student Consultation List' },
+            consultations_for_you: { id: 'Konsultasi untuk Anda', en: 'Consultations for You' },
+            your_consultation: { id: 'Konsultasi Anda', en: 'Your Consultation' },
+            counselor: { id: 'Konselor', en: 'Counselor' },
+            not_assigned: { id: 'Belum ditugaskan', en: 'Not assigned' },
+            messages: { id: 'pesan', en: 'messages' },
+            back_to_dashboard: { id: 'Kembali ke Dashboard', en: 'Back to Dashboard' },
+            topic: { id: 'Topik', en: 'Topic' },
+            status_new: { id: 'Baru', en: 'New' },
+            status_in_progress: { id: 'Dalam Proses', en: 'In Progress' },
+            status_done: { id: 'Selesai', en: 'Done' },
+            initial_problem_desc: { id: 'Deskripsi Masalah Awal:', en: 'Initial Problem Description:' },
+            type_your_message: { id: 'Ketik pesan Anda...', en: 'Type your message...' },
+            consultation_form_title: { id: 'Form Pengajuan Konsultasi', en: 'Consultation Request Form' },
+            class: { id: 'Kelas', en: 'Class' },
+            class_placeholder: { id: 'Contoh: XII IPA 1', en: 'Example: 12th Grade Science 1' },
+            problem_category: { id: 'Kategori Masalah', en: 'Problem Category' },
+            select_category: { id: 'Pilih Kategori', en: 'Select Category' },
+            category_academic: { id: 'Akademik', en: 'Academic' },
+            category_career: { id: 'Karir', en: 'Career' },
+            category_pribadi_sosial: { id: 'Pribadi/Sosial', en: 'Personal/Social' },
+            category_lainnya: { id: 'Lainnya', en: 'Other' },
+            describe_your_problem: { id: 'Deskripsikan Masalah Anda', en: 'Describe Your Problem' },
+            describe_your_problem_placeholder: { id: 'Ceritakan dengan singkat masalah yang sedang Anda hadapi...', en: 'Briefly describe the problem you are facing...' },
+            choose_counselor: { id: 'Pilih Konselor', en: 'Choose Counselor' },
+            select_counselor: { id: 'Pilih seorang konselor', en: 'Select a counselor' },
+            send_request: { id: 'Kirim Pengajuan', en: 'Send Request' },
+            theme: { id: 'Tema', en: 'Theme' },
+            theme_default: { id: 'Bawaan', en: 'Default' },
+            theme_tenang: { id: 'Tenang', en: 'Calm' },
+            theme_fokus: { id: 'Fokus', en: 'Focus' },
+            theme_energi: { id: 'Energi', en: 'Energy' },
+            theme_malam: { id: 'Malam', en: 'Night' },
+            music_select: { id: 'Pilih Musik', en: 'Select Music'},
+            music_none: { id: 'Tanpa Musik', en: 'No Music'},
+            music_calm_piano: { id: 'Piano Tenang', en: 'Calm Piano'},
+            music_rain_sounds: { id: 'Suara Hujan', en: 'Rain Sounds'},
+            music_lofi_chill: { id: 'Lofi Chill', en: 'Lofi Chill'},
+            music_forest_sounds: { id: 'Suara Hutan', en: 'Forest Sounds' },
+            music_ocean_waves: { id: 'Deburan Ombak', en: 'Ocean Waves' },
+            music_study_ambient: { id: 'Musik Belajar', en: 'Study Ambient' },
+        };
+        
+        const themes = {
+            default: { name: 'theme_default', vars: { '--c-primary': '#4f46e5', '--c-primary-dark': '#4338ca', '--c-bg-app': '#f3f4f6', '--c-bg-card': '#ffffff', '--c-text-main': '#1f2937', '--c-text-muted': '#6b7280', '--c-text-on-primary': '#ffffff', '--c-border': '#d1d5db', '--c-bubble-sent-bg': '#4f46e5', '--c-bubble-sent-text': '#ffffff', '--c-bubble-received-bg': '#e5e7eb', '--c-bubble-received-text': '#1f2937', '--c-login-grad-from': '#3b82f6', '--c-login-grad-to': '#6366f1' }},
+            tenang: { name: 'theme_tenang', vars: { '--c-primary': '#0d9488', '--c-primary-dark': '#0f766e', '--c-bg-app': '#f0fdfa', '--c-bg-card': '#ffffff', '--c-text-main': '#1f2937', '--c-text-muted': '#57534e', '--c-text-on-primary': '#ffffff', '--c-border': '#d1d5db', '--c-bubble-sent-bg': '#0d9488', '--c-bubble-sent-text': '#ffffff', '--c-bubble-received-bg': '#dcfce7', '--c-bubble-received-text': '#1f2937', '--c-login-grad-from': '#5eead4', '--c-login-grad-to': '#2dd4bf' }},
+            fokus: { name: 'theme_fokus', vars: { '--c-primary': '#818cf8', '--c-primary-dark': '#6366f1', '--c-bg-app': '#111827', '--c-bg-card': '#1f2937', '--c-text-main': '#f9fafb', '--c-text-muted': '#9ca3af', '--c-text-on-primary': '#111827', '--c-border': '#374151', '--c-bubble-sent-bg': '#818cf8', '--c-bubble-sent-text': '#111827', '--c-bubble-received-bg': '#374151', '--c-bubble-received-text': '#f9fafb', '--c-login-grad-from': '#1e293b', '--c-login-grad-to': '#0f172a' }},
+            energi: { name: 'theme_energi', vars: { '--c-primary': '#f97316', '--c-primary-dark': '#ea580c', '--c-bg-app': '#fff7ed', '--c-bg-card': '#ffffff', '--c-text-main': '#1c1917', '--c-text-muted': '#57534e', '--c-text-on-primary': '#ffffff', '--c-border': '#e7e5e4', '--c-bubble-sent-bg': '#f97316', '--c-bubble-sent-text': '#ffffff', '--c-bubble-received-bg': '#ffedd5', '--c-bubble-received-text': '#1c1917', '--c-login-grad-from': '#fb923c', '--c-login-grad-to': '#f59e0b' }},
+            malam: { name: 'theme_malam', vars: { '--c-primary': '#ec4899', '--c-primary-dark': '#db2777', '--c-bg-app': '#1e1b4b', '--c-bg-card': '#312e81', '--c-text-main': '#e0e7ff', '--c-text-muted': '#a5b4fc', '--c-text-on-primary': '#ffffff', '--c-border': '#4338ca', '--c-bubble-sent-bg': '#ec4899', '--c-bubble-sent-text': '#ffffff', '--c-bubble-received-bg': '#4338ca', '--c-bubble-received-text': '#e0e7ff', '--c-login-grad-from': '#312e81', '--c-login-grad-to': '#1e1b4b' }}
+        };
+
+        const musicTracks = [
+            { id: 'none', name: 'music_none', src: '' },
+            { id: 'calm_piano', name: 'music_calm_piano', src: 'https://cdn.pixabay.com/download/audio/2022/10/19/audio_b2810a9fce.mp3' },
+            { id: 'rain_sounds', name: 'music_rain_sounds', src: 'https://cdn.pixabay.com/download/audio/2022/08/16/audio_394a6dce6a.mp3' },
+            { id: 'lofi_chill', name: 'music_lofi_chill', src: 'https://cdn.pixabay.com/download/audio/2022/02/07/audio_c3a535e3d7.mp3' },
+            { id: 'forest_sounds', name: 'music_forest_sounds', src: 'https://cdn.pixabay.com/download/audio/2022/08/23/audio_13d77f329c.mp3' },
+            { id: 'ocean_waves', name: 'music_ocean_waves', src: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_73c9c6474b.mp3' },
+            { id: 'study_ambient', name: 'music_study_ambient', src: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1b6234326f.mp3' }
+        ];
+
+        const counselors = [
+            { id: 1, name: 'Dra. Heti Supriati', specialty: 'Guru BK' },
+            { id: 2, name: 'Dra. Imas Aliah, M.Pd.', specialty: 'Guru BK' },
+            { id: 3, name: 'Dra. Ai Soraya', specialty: 'Guru BK' },
+            { id: 4, name: 'Tazkiyatul Aini, S.Pd.', specialty: 'Guru BK' }
+        ];
+
+        function t(key) {
+            return translations[key] ? (translations[key][state.currentLang] || translations[key]['id']) : key;
+        }
+
+        // === STATE MANAGEMENT ===
+        const state = {
+            currentView: 'login', 
+            currentUser: null,
+            selectedKonsultasi: null,
+            currentLang: 'id',
+            currentTheme: 'default',
+            isMusicPlaying: false,
+            currentMusicTrack: 'none',
+            konsultasiData: [ ],
+        };
+        state.konsultasiData = [
+            { id: 1, siswaName: 'Budi Santoso', kelas: 'XII IPA 1', kategori: 'Karir', deskripsi: 'Saya merasa bingung memilih jurusan kuliah, antara Teknik Informatika dan Desain Grafis.', status: 'Selesai', konselorName: 'Dra. Imas Aliah, M.Pd.', chatHistory: [{ sender: 'Budi Santoso', text: 'Assalamualaikum Bu...' }, { sender: 'Dra. Imas Aliah, M.Pd.', text: 'Waalaikumsalam Budi...' }] },
+            { id: 2, siswaName: 'Citra Lestari', kelas: 'XI IPS 3', kategori: 'Pribadi/Sosial', deskripsi: 'Akhir-akhir ini saya merasa kesulitan bergaul dengan teman-teman sekelas.', status: 'Dalam Proses', konselorName: 'Tazkiyatul Aini, S.Pd.', chatHistory: [{ sender: 'Citra Lestari', text: 'Selamat pagi, Bu...' }, { sender: 'Tazkiyatul Aini, S.Pd.', text: 'Selamat pagi, Citra...' }] },
+            { id: 3, siswaName: 'Doni Firmansyah', kelas: 'X-2', kategori: 'Akademik', deskripsi: 'Saya kesulitan mengatur waktu antara belajar dan kegiatan ekstrakurikuler.', status: 'Baru', konselorName: 'Dra. Heti Supriati', chatHistory: [{ sender: 'Doni Firmansyah', text: 'Assalamualaikum Bu...' }] }
+        ];
+
+        // === TEMPLATES / COMPONENTS ===
+        function CommonSelectors() {
+            return `
+                <div class="flex items-center gap-2">
+                    <label for="theme-select" class="text-sm text-muted"><i class="fas fa-palette"></i></label>
+                    <select id="theme-select" onchange="setTheme(this.value)" class="border-main rounded-md text-sm py-1 bg-card text-main focus:ring-primary focus:border-primary">
+                        ${Object.keys(themes).map(key => `<option value="${key}" ${state.currentTheme === key ? 'selected' : ''}>${t(themes[key].name)}</option>`).join('')}
+                    </select>
+                     <label for="lang-select" class="text-sm text-muted"><i class="fas fa-globe"></i></label>
+                    <select id="lang-select" onchange="setLanguage(this.value)" class="border-main rounded-md text-sm py-1 bg-card text-main focus:ring-primary focus:border-primary">
+                        <option value="id" ${state.currentLang === 'id' ? 'selected' : ''}>ID</option>
+                        <option value="en" ${state.currentLang === 'en' ? 'selected' : ''}>EN</option>
+                    </select>
+                </div>
+            `;
+        }
+        
+        function LoginView() {
+            return `
+                <div class="min-h-screen flex items-center justify-center login-gradient px-4 fade-in">
+                    <div class="w-full max-w-md bg-card rounded-2xl shadow-2xl p-8 space-y-6 relative">
+                        <div class="absolute top-4 right-4">${CommonSelectors()}</div>
+                        <div class="text-center pt-12">
+                            <i class="fas fa-hands-helping text-5xl text-primary"></i>
+                            <h1 class="text-3xl font-bold text-main mt-4">${t('app_title')}</h1>
+                            <p class="font-semibold text-muted">${t('school_name')}</p>
+                            <p class="text-muted text-sm">${t('app_subtitle')}</p>
+                        </div>
+                        <form onsubmit="login(event)" class="space-y-4">
+                            <div class="flex justify-center gap-6">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="role" value="siswa" checked onchange="toggleLoginInput('siswa')" class="form-radio text-primary focus:ring-primary focus:ring-opacity-50">
+                                    <span class="text-main">${t('role_student')}</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="role" value="konselor" onchange="toggleLoginInput('konselor')" class="form-radio text-primary focus:ring-primary focus:ring-opacity-50">
+                                    <span class="text-main">${t('role_counselor')}</span>
+                                </label>
+                            </div>
+                            
+                            <div id="siswa-input-div" class="space-y-4">
+                                <div>
+                                    <label for="name" class="block text-sm font-medium text-main">${t('full_name')}</label>
+                                    <input id="name" type="text" class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('enter_your_name')}">
+                                </div>
+                                <div>
+                                    <label for="student-password" class="block text-sm font-medium text-main">${t('password')}</label>
+                                    <input id="student-password" type="password" class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('enter_password')}">
+                                </div>
+                            </div>
+
+                            <div id="konselor-input-div" class="hidden space-y-4">
+                                <div>
+                                    <label for="counselor-select-login" class="block text-sm font-medium text-main">${t('full_name')}</label>
+                                    <select id="counselor-select-login" class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main">
+                                        <option value="">${t('select_counselor')}</option>
+                                        ${counselors.map(c => `<option value="${c.name}">${c.name}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="counselor-password" class="block text-sm font-medium text-main">${t('password')}</label>
+                                    <input id="counselor-password" type="password" class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('enter_password')}">
+                                </div>
+                            </div>
+
+                            <div class="pt-2">
+                                <button type="submit" class="w-full py-3 px-4 bg-primary text-on-primary font-semibold rounded-lg shadow-md hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-transform transform hover:scale-105">
+                                    <i class="fas fa-sign-in-alt mr-2"></i> ${t('login_button')}
+                                </button>
+                            </div>
+                        </form>
+                        <p id="login-error" class="text-red-500 text-sm text-center"></p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function MainLayout(content) {
+            const roleText = state.currentUser.role === 'siswa' ? t('role_student') : t('role_counselor');
+            return `
+                <div class="min-h-screen">
+                    <header class="bg-card shadow-md sticky top-0 z-10">
+                        <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                            <div class="flex items-center justify-between h-16">
+                                <div class="flex items-center">
+                                    <i class="fas fa-hands-helping text-3xl text-primary"></i>
+                                    <div class="ml-2">
+                                        <span class="font-bold text-xl text-main">${t('app_title')}</span>
+                                        <span class="text-xs text-muted block">${t('school_name')}</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-4">
+                                     ${CommonSelectors()}
+                                    <div class="text-right">
+                                        <p class="font-semibold text-main">${state.currentUser.name}</p>
+                                        <p class="text-sm text-muted">${roleText}</p>
+                                    </div>
+                                    <button onclick="logout()" class="ml-2 p-2 rounded-full text-muted hover:bg-red-100 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                        <i class="fas fa-sign-out-alt fa-lg"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </nav>
+                    </header>
+                    <main class="p-4 sm:p-6 lg:p-8 fade-in">
+                        ${content}
+                    </main>
+                </div>
+                ${ModalWrapper()}
+            `;
+        }
+        
+        function getStatusBadge(status) {
+             const statusText = { 'Baru': t('status_new'), 'Dalam Proses': t('status_in_progress'), 'Selesai': t('status_done') }[status] || status;
+            switch (status) {
+                case 'Baru': return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">${statusText}</span>`;
+                case 'Dalam Proses': return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">${statusText}</span>`;
+                case 'Selesai': return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">${statusText}</span>`;
+                default: return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">${statusText}</span>`;
+            }
+        }
+        
+        function KonsultasiCard(konsultasi) {
+            const isKonselor = state.currentUser.role === 'konselor';
+            const categoryKey = `category_${konsultasi.kategori.toLowerCase().replace(/[\/ ]/g, '_')}`;
+            const translatedCategory = t(categoryKey);
+            return `
+                <div class="bg-card rounded-xl shadow-lg p-5 hover:shadow-xl transition-shadow duration-300 cursor-pointer" onclick="openChat(${konsultasi.id})">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm text-muted">${translatedCategory}</p>
+                            <h3 class="text-lg font-bold text-main">${isKonselor ? konsultasi.siswaName : t('your_consultation')}</h3>
+                            <p class="text-sm text-muted">${isKonselor ? konsultasi.kelas : `ID: #${konsultasi.id}`}</p>
+                        </div>
+                        ${getStatusBadge(konsultasi.status)}
+                    </div>
+                    <p class="mt-3 text-muted text-sm line-clamp-2">${konsultasi.deskripsi}</p>
+                    <div class="mt-4 pt-4 border-t border-main flex justify-between items-center text-xs text-muted">
+                        <span>${t('counselor')}: ${konsultasi.konselorName || t('not_assigned')}</span>
+                        <span class="flex items-center"><i class="far fa-comments mr-1"></i> ${konsultasi.chatHistory.length} ${t('messages')}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function DashboardSiswaView() {
+            const myKonsultasi = state.konsultasiData.filter(k => k.siswaName === state.currentUser.name);
+            const content = `
+                <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
+                    <h2 class="text-2xl font-bold text-main">${t('your_consultation_history')}</h2>
+                    <button onclick="openModal('formKonsultasi')" class="bg-primary text-on-primary font-bold py-2 px-4 rounded-lg shadow-md hover:bg-primary-dark transition-transform transform hover:scale-105">
+                        <i class="fas fa-plus mr-2"></i>${t('create_new_consultation')}
+                    </button>
+                </div>
+                ${myKonsultasi.length > 0 ? `<div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">${myKonsultasi.map(KonsultasiCard).join('')}</div>` : `<div class="text-center py-16 bg-card rounded-lg shadow"><i class="fas fa-folder-open text-5xl text-gray-300"></i><h3 class="mt-4 text-xl font-semibold text-main">${t('no_consultation_yet')}</h3><p class="text-muted mt-1">${t('no_consultation_desc')}</p></div>`}
+            `;
+            return MainLayout(content);
+        }
+
+        function DashboardKonselorView() {
+            const assignedConsultations = state.konsultasiData.filter(k => k.konselorName === state.currentUser.name);
+             const content = `
+                <h2 class="text-2xl font-bold text-main mb-6">${t('consultations_for_you')}</h2>
+                ${assignedConsultations.length > 0 ? `
+                    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        ${assignedConsultations.map(KonsultasiCard).join('')}
+                    </div>
+                ` : `
+                    <div class="text-center py-16 bg-card rounded-lg shadow">
+                        <i class="fas fa-inbox text-5xl text-gray-300"></i>
+                        <h3 class="mt-4 text-xl font-semibold text-main">Belum ada konsultasi untuk Anda</h3>
+                        <p class="text-muted mt-1">Saat siswa memilih Anda sebagai konselor, sesi akan muncul di sini.</p>
+                    </div>
+                `}
+            `;
+            return MainLayout(content);
+        }
+        
+        function ChatView() {
+            const k = state.selectedKonsultasi;
+            if (!k) return '<div>Error: Konsultasi tidak ditemukan.</div>';
+            
+            const isKonselor = state.currentUser.role === 'konselor';
+            const categoryKey = `category_${k.kategori.toLowerCase().replace(/[\/ ]/g, '_')}`;
+            const translatedCategory = t(categoryKey);
+
+            const chatBubbles = k.chatHistory.map(chat => `<div class="chat ${chat.sender === state.currentUser.name ? 'chat-end' : 'chat-start'}"><div class="chat-header text-xs text-muted mb-1">${chat.sender}</div><div class="chat-bubble ${chat.sender === state.currentUser.name ? 'bubble-sent' : 'bubble-received'}">${chat.text}</div></div>`).join('');
+            
+            const musicPlayer = `
+                <div class="flex items-center gap-2">
+                    <select id="music-select" onchange="setMusic(this.value)" class="rounded-lg border-main bg-card text-main focus:ring-primary focus:border-primary text-sm p-1">
+                        ${musicTracks.map(track => `<option value="${track.id}" ${state.currentMusicTrack === track.id ? 'selected' : ''}>${t(track.name)}</option>`).join('')}
+                    </select>
+                    <button id="music-btn" onclick="toggleMusic()" class="text-muted hover:text-primary text-xl ${state.currentMusicTrack === 'none' ? 'hidden' : ''}">
+                        <i class="fas ${state.isMusicPlaying ? 'fa-pause-circle' : 'fa-play-circle'}"></i>
+                    </button>
+                </div>
+            `;
+
+            return MainLayout(`
+                <div>
+                    <button onclick="backToDashboard()" class="mb-4 text-primary font-semibold hover:underline">
+                        <i class="fas fa-arrow-left mr-2"></i>${t('back_to_dashboard')}
+                    </button>
+                    <div class="bg-card rounded-2xl shadow-xl overflow-hidden">
+                        <div class="p-4 border-b border-main flex flex-wrap gap-4 justify-between items-center">
+                            <div>
+                                <h3 class="font-bold text-lg text-main">${k.siswaName} (${k.kelas})</h3>
+                                <p class="text-sm text-muted">${t('topic')}: ${translatedCategory}</p>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                ${musicPlayer}
+                                ${isKonselor && state.currentUser.name === k.konselorName ? `<select id="status-select" onchange="updateStatus(${k.id})" class="rounded-lg border-main bg-card text-main focus:ring-primary focus:border-primary text-sm"><option value="Baru" ${k.status === 'Baru' ? 'selected' : ''}>${t('status_new')}</option><option value="Dalam Proses" ${k.status === 'Dalam Proses' ? 'selected' : ''}>${t('status_in_progress')}</option><option value="Selesai" ${k.status === 'Selesai' ? 'selected' : ''}>${t('status_done')}</option></select>` : getStatusBadge(k.status)}
+                            </div>
+                        </div>
+                        <div class="p-4 border-b border-main"><h4 class="font-semibold mb-2 text-main">${t('initial_problem_desc')}</h4><p class="text-sm bg-yellow-50 text-yellow-900 p-3 rounded-lg">${k.deskripsi}</p></div>
+                        <div id="chat-box" class="p-4 h-96 overflow-y-auto space-y-4 flex flex-col">${chatBubbles}</div>
+                        <div class="p-4 border-t border-main"><form onsubmit="sendMessage(event, ${k.id})"><div class="flex items-center gap-2"><input id="chat-input" type="text" class="w-full px-4 py-2 border border-main rounded-full focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('type_your_message')}"><button type="submit" class="bg-primary text-on-primary rounded-full p-3 hover:bg-primary-dark transition"><i class="fas fa-paper-plane"></i></button></div></form></div>
+                    </div>
+                </div>`);
+        }
+
+        function ModalWrapper() {
+            return `<div id="modal-container" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop"><div id="modal-content" class="bg-card rounded-2xl shadow-2xl w-full max-w-lg relative fade-in"></div></div>`;
+        }
+
+        function FormKonsultasiModal() {
+            return `
+                <button onclick="closeModal()" class="absolute top-4 right-4 text-muted hover:text-main"><i class="fas fa-times fa-lg"></i></button>
+                <form onsubmit="submitKonsultasi(event)" class="p-8">
+                    <h2 class="text-2xl font-bold mb-6 text-center text-main">${t('consultation_form_title')}</h2>
+                    <div class="space-y-4">
+                        <div><label for="kelas" class="block text-sm font-medium text-main">${t('class')}</label><input id="kelas" type="text" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('class_placeholder')}"></div>
+                        <div><label for="kategori" class="block text-sm font-medium text-main">${t('problem_category')}</label><select id="kategori" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main"><option value="">${t('select_category')}</option><option value="Akademik">${t('category_academic')}</option><option value="Karir">${t('category_career')}</option><option value="Pribadi/Sosial">${t('category_pribadi_sosial')}</option><option value="Lainnya">${t('category_lainnya')}</option></select></div>
+                        <div>
+                            <label for="konselor" class="block text-sm font-medium text-main">${t('choose_counselor')}</label>
+                            <select id="konselor" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main">
+                                <option value="">${t('select_counselor')}</option>
+                                ${counselors.map(c => `<option value="${c.name}">${c.name} (${c.specialty})</option>`).join('')}
+                            </select>
+                        </div>
+                        <div><label for="deskripsi" class="block text-sm font-medium text-main">${t('describe_your_problem')}</label><textarea id="deskripsi" rows="5" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('describe_your_problem_placeholder')}"></textarea></div>
+                        <div class="pt-4"><button type="submit" class="w-full py-3 px-4 bg-primary text-on-primary font-semibold rounded-lg shadow-md hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">${t('send_request')}</button></div>
+                    </div>
+                </form>`;
+        }
+
+        // === CONTROLLERS / LOGIC ===
+        function render() {
+            const app = document.getElementById('app');
+            document.title = `${t('app_title')} - ${t('school_name')}`;
+
+            switch(state.currentView) {
+                case 'login': app.innerHTML = LoginView(); break;
+                case 'dashboard_siswa': app.innerHTML = DashboardSiswaView(); break;
+                case 'dashboard_konselor': app.innerHTML = DashboardKonselorView(); break;
+                case 'chat':
+                    app.innerHTML = ChatView();
+                    setTimeout(() => { const chatBox = document.getElementById('chat-box'); if(chatBox) chatBox.scrollTop = chatBox.scrollHeight; }, 0);
+                    break;
+            }
+            // After rendering login view, if toggle function exists, call it to set initial state
+            if (state.currentView === 'login' && typeof toggleLoginInput === 'function') {
+                const role = document.querySelector('input[name="role"]:checked')?.value || 'siswa';
+                toggleLoginInput(role);
+            }
+        }
+        
+        function setTheme(themeName) {
+            const theme = themes[themeName];
+            if (!theme) return;
+            for (const [key, value] of Object.entries(theme.vars)) {
+                document.documentElement.style.setProperty(key, value);
+            }
+            state.currentTheme = themeName;
+            render(); // Re-render to update selects if needed
+        }
+
+        function setLanguage(lang) {
+            state.currentLang = lang;
+            document.documentElement.lang = lang;
+            render();
+        }
+
+        function toggleLoginInput(role) {
+            const siswaDiv = document.getElementById('siswa-input-div');
+            const konselorDiv = document.getElementById('konselor-input-div');
+            if (role === 'siswa') {
+                siswaDiv.classList.remove('hidden');
+                konselorDiv.classList.add('hidden');
+            } else {
+                siswaDiv.classList.add('hidden');
+                konselorDiv.classList.remove('hidden');
+            }
+        }
+
+        function login(event) {
+            event.preventDefault();
+            const role = document.querySelector('input[name="role"]:checked').value;
+            const errorEl = document.getElementById('login-error');
+            errorEl.textContent = ''; // Clear previous errors
+            let name = '';
+
+            if (role === 'siswa') {
+                const nameInput = document.getElementById('name');
+                const passwordInput = document.getElementById('student-password');
+                name = nameInput.value.trim();
+                const password = passwordInput.value;
+                const correctPassword = '111';
+
+                if (!name) {
+                    errorEl.textContent = t('name_required');
+                    return;
+                }
+                if (password !== correctPassword) {
+                    errorEl.textContent = t('password_incorrect');
+                    return;
+                }
+            } else { // counselor
+                const counselorSelect = document.getElementById('counselor-select-login');
+                const passwordInput = document.getElementById('counselor-password');
+                name = counselorSelect.value;
+                const password = passwordInput.value;
+                const correctPassword = '123';
+
+                if (!name) {
+                    errorEl.textContent = t('name_required');
+                    return;
+                }
+                if (password !== correctPassword) {
+                    errorEl.textContent = t('password_incorrect');
+                    return;
+                }
+            }
+            
+            state.currentUser = { name, role };
+            state.currentView = role === 'siswa' ? 'dashboard_siswa' : 'dashboard_konselor';
+            render();
+        }
+        
+        function stopMusic() {
+            const music = document.getElementById('counseling-music');
+            music.pause();
+            music.currentTime = 0;
+            state.isMusicPlaying = false;
+            state.currentMusicTrack = 'none';
+        }
+
+        function logout() {
+            stopMusic();
+            state.currentUser = null;
+            state.currentView = 'login';
+            render();
+        }
+        
+        function openChat(konsultasiId) {
+            state.selectedKonsultasi = state.konsultasiData.find(k => k.id === konsultasiId);
+            // Automatically change status to "In Progress" if a counselor opens their assigned new case
+            if (state.currentUser.role === 'konselor' && state.selectedKonsultasi.konselorName === state.currentUser.name && state.selectedKonsultasi.status === 'Baru') {
+                state.selectedKonsultasi.status = 'Dalam Proses';
+            }
+            state.currentView = 'chat';
+            render();
+        }
+        
+        function backToDashboard() {
+            stopMusic();
+            state.selectedKonsultasi = null;
+            state.currentView = state.currentUser.role === 'siswa' ? 'dashboard_siswa' : 'dashboard_konselor';
+            render();
+        }
+
+        function sendMessage(event, konsultasiId) {
+            event.preventDefault();
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (text) {
+                const konsultasi = state.konsultasiData.find(k => k.id === konsultasiId);
+                // Allow both student and assigned counselor to send message
+                if (state.currentUser.name === konsultasi.siswaName || state.currentUser.name === konsultasi.konselorName) {
+                    konsultasi.chatHistory.push({ sender: state.currentUser.name, text: text });
+                    input.value = '';
+                    render();
+                }
+            }
+        }
+        
+        function updateStatus(konsultasiId) {
+            const select = document.getElementById('status-select');
+            const newStatus = select.value;
+            const konsultasi = state.konsultasiData.find(k => k.id === konsultasiId);
+            konsultasi.status = newStatus;
+        }
+
+        function setMusic(trackId) {
+            state.currentMusicTrack = trackId;
+            const music = document.getElementById('counseling-music');
+            const selectedTrack = musicTracks.find(t => t.id === trackId);
+            
+            if (selectedTrack && selectedTrack.src) {
+                music.src = selectedTrack.src;
+                if (state.isMusicPlaying) {
+                    music.play();
+                }
+            } else {
+                music.pause();
+                music.src = '';
+                state.isMusicPlaying = false;
+            }
+            render();
+        }
+        
+        function toggleMusic() {
+            if (state.currentMusicTrack === 'none') return;
+            const music = document.getElementById('counseling-music');
+            state.isMusicPlaying = !state.isMusicPlaying;
+            if (state.isMusicPlaying) { music.play(); } else { music.pause(); }
+            render(); 
+        }
+
+        function openModal(modalType) {
+            const modalContainer = document.getElementById('modal-container');
+            const modalContent = document.getElementById('modal-content');
+            if(modalType === 'formKonsultasi') { modalContent.innerHTML = FormKonsultasiModal(); }
+            modalContainer.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            const modalContainer = document.getElementById('modal-container');
+            modalContainer.classList.add('hidden');
+            document.getElementById('modal-content').innerHTML = '';
+        }
+        
+        function submitKonsultasi(event) {
+            event.preventDefault();
+            const newKonsultasi = {
+                id: Date.now(),
+                siswaName: state.currentUser.name,
+                kelas: document.getElementById('kelas').value,
+                kategori: document.getElementById('kategori').value,
+                konselorName: document.getElementById('konselor').value,
+                deskripsi: document.getElementById('deskripsi').value,
+                status: 'Baru',
+                chatHistory: [ { sender: state.currentUser.name, text: document.getElementById('deskripsi').value } ]
+            };
+            state.konsultasiData.unshift(newKonsultasi);
+            closeModal();
+            render();
+        }
+
+        // === INITIALIZATION ===
+        document.addEventListener('DOMContentLoaded', () => {
+            setTheme(state.currentTheme); 
+            render();
+        });
+
+    </script>
+</body>
+</html>

@@ -40,18 +40,6 @@
         .modal-backdrop {
             background-color: rgba(0,0,0,0.5);
         }
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid var(--c-primary);
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
         .bg-primary { background-color: var(--c-primary); }
         .text-primary { color: var(--c-primary); }
         .text-on-primary { color: var(--c-text-on-primary); }
@@ -74,33 +62,29 @@
     </div>
     
     <audio id="counseling-music" loop></audio>
-    
-    <script type="module">
-        // === FIREBASE IMPORTS ===
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, query, where, doc, updateDoc, arrayUnion, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        
-        // === GLOBAL FIREBASE VARIABLES ===
-        let db, auth, app;
-        let unsubscribe = null; // To detach listeners on logout
 
+    <script>
         // === TRANSLATION & THEME MANAGEMENT ===
         const translations = {
             app_title: { id: 'e-Counseling', en: 'e-Counseling' },
             app_subtitle: { id: 'Platform Konseling Siswa Digital', en: 'Digital Student Counseling Platform' },
             school_name: { id: 'SMAN 1 DRAMAGA', en: 'SMAN 1 DRAMAGA' },
             full_name: { id: 'Nama Lengkap', en: 'Full Name' },
+            username: { id: 'Nama Pengguna', en: 'Username' },
             enter_your_name: { id: 'Masukkan nama Anda', en: 'Enter your name' },
+            enter_username: { id: 'Masukkan nama pengguna', en: 'Enter username' },
             login_as_student: { id: 'Masuk sebagai Siswa', en: 'Login as Student' },
             login_as_counselor: { id: 'Masuk sebagai Konselor', en: 'Login as Counselor' },
+            login_as_admin: { id: 'Masuk sebagai Admin', en: 'Login as Admin' },
             login_button: { id: 'Masuk', en: 'Login' },
-            name_required: { id: 'Nama atau pilihan tidak boleh kosong.', en: 'Name or selection cannot be empty.' },
+            name_required: { id: 'Nama tidak boleh kosong.', en: 'Name cannot be empty.' },
+            username_required: { id: 'Nama pengguna tidak boleh kosong.', en: 'Username cannot be empty.' },
             password: { id: 'Kata Sandi', en: 'Password' },
             enter_password: { id: 'Masukkan kata sandi', en: 'Enter password' },
             password_incorrect: { id: 'Kata sandi salah.', en: 'Incorrect password.' },
             role_student: { id: 'Siswa', en: 'Student' },
             role_counselor: { id: 'Konselor', en: 'Counselor' },
+            role_admin: { id: 'Administrator', en: 'Administrator' },
             your_consultation_history: { id: 'Riwayat Konsultasi Anda', en: 'Your Consultation History' },
             create_new_consultation: { id: 'Buat Konsultasi Baru', en: 'Create New Consultation' },
             no_consultation_yet: { id: 'Belum Ada Konsultasi', en: 'No Consultation Yet' },
@@ -112,6 +96,7 @@
             not_assigned: { id: 'Belum ditugaskan', en: 'Not assigned' },
             messages: { id: 'pesan', en: 'messages' },
             back_to_dashboard: { id: 'Kembali ke Dashboard', en: 'Back to Dashboard' },
+            back_to_role_selection: { id: 'Kembali', en: 'Back'},
             topic: { id: 'Topik', en: 'Topic' },
             status_new: { id: 'Baru', en: 'New' },
             status_in_progress: { id: 'Dalam Proses', en: 'In Progress' },
@@ -146,7 +131,13 @@
             music_forest_sounds: { id: 'Suara Hutan', en: 'Forest Sounds' },
             music_ocean_waves: { id: 'Deburan Ombak', en: 'Ocean Waves' },
             music_study_ambient: { id: 'Musik Belajar', en: 'Study Ambient' },
-            loading: {id: 'Memuat...', en: 'Loading...'}
+            admin_dashboard: { id: 'Dasbor Admin', en: 'Admin Dashboard' },
+            manage_counselors: { id: 'Kelola Guru Konselor', en: 'Manage Counselors' },
+            add_new_counselor: { id: 'Tambah Konselor Baru', en: 'Add New Counselor' },
+            counselor_name: { id: 'Nama Konselor', en: 'Counselor Name' },
+            specialty: { id: 'Spesialisasi (cth: Guru BK)', en: 'Specialty (e.g., School Counselor)' },
+            add_counselor: { id: 'Tambah Konselor', en: 'Add Counselor' },
+            existing_counselors: { id: 'Daftar Konselor Saat Ini', en: 'Current Counselor List' }
         };
         
         const themes = {
@@ -167,51 +158,42 @@
             { id: 'study_ambient', name: 'music_study_ambient', src: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1b6234326f.mp3' }
         ];
 
-        const counselors = [
-            { id: 1, name: 'Dra. Heti Supriati', specialty: 'Guru BK' },
-            { id: 2, name: 'Dra. Imas Aliah, M.Pd.', specialty: 'Guru BK' },
-            { id: 3, name: 'Dra. Ai Soraya', specialty: 'Guru BK' },
-            { id: 4, name: 'Tazkiyatul Aini, S.Pd.', specialty: 'Guru BK' }
-        ];
-
         function t(key) {
             return translations[key] ? (translations[key][state.currentLang] || translations[key]['id']) : key;
         }
 
         // === STATE MANAGEMENT ===
         const state = {
-            currentView: 'loading', 
+            currentView: 'role_selection', 
             currentUser: null,
-            selectedKonsultasiId: null,
+            selectedKonsultasi: null,
             currentLang: 'id',
             currentTheme: 'default',
             isMusicPlaying: false,
             currentMusicTrack: 'none',
-            konsultasiData: [], // This will now be populated from Firestore
-            isAuthReady: false
+            counselors: [
+                { id: 1, name: 'Dra. Heti Supriati', specialty: 'Guru BK' },
+                { id: 2, name: 'Dra. Imas Aliah, M.Pd.', specialty: 'Guru BK' },
+                { id: 3, name: 'Dra. Ai Soraya', specialty: 'Guru BK' },
+                { id: 4, name: 'Tazkiyatul Aini, S.Pd.', specialty: 'Guru BK' }
+            ],
+            konsultasiData: [
+                { id: 1, siswaName: 'Budi Santoso', kelas: 'XII IPA 1', kategori: 'Karir', deskripsi: 'Saya merasa bingung memilih jurusan kuliah, antara Teknik Informatika dan Desain Grafis.', status: 'Selesai', konselorName: 'Dra. Imas Aliah, M.Pd.', chatHistory: [{ sender: 'Budi Santoso', text: 'Assalamualaikum Bu...' }, { sender: 'Dra. Imas Aliah, M.Pd.', text: 'Waalaikumsalam Budi...' }] },
+                { id: 2, siswaName: 'Citra Lestari', kelas: 'XI IPS 3', kategori: 'Pribadi/Sosial', deskripsi: 'Akhir-akhir ini saya merasa kesulitan bergaul dengan teman-teman sekelas.', status: 'Dalam Proses', konselorName: 'Tazkiyatul Aini, S.Pd.', chatHistory: [{ sender: 'Citra Lestari', text: 'Selamat pagi, Bu...' }, { sender: 'Tazkiyatul Aini, S.Pd.', text: 'Selamat pagi, Citra...' }] },
+                { id: 3, siswaName: 'Doni Firmansyah', kelas: 'X-2', kategori: 'Akademik', deskripsi: 'Saya kesulitan mengatur waktu antara belajar dan kegiatan ekstrakurikuler.', status: 'Baru', konselorName: 'Dra. Heti Supriati', chatHistory: [{ sender: 'Doni Firmansyah', text: 'Assalamualaikum Bu...' }] }
+            ],
         };
 
         // === TEMPLATES / COMPONENTS ===
-        function LoadingView() {
-             return `
-                <div class="min-h-screen flex items-center justify-center login-gradient">
-                    <div class="text-center text-white">
-                        <div class="loader mx-auto"></div>
-                        <p class="mt-4 text-lg font-semibold">${t('loading')}</p>
-                    </div>
-                </div>
-            `;
-        }
-
         function CommonSelectors() {
             return `
                 <div class="flex items-center gap-2">
                     <label for="theme-select" class="text-sm text-muted"><i class="fas fa-palette"></i></label>
-                    <select id="theme-select" onchange="window.setTheme(this.value)" class="border-main rounded-md text-sm py-1 bg-card text-main focus:ring-primary focus:border-primary">
+                    <select id="theme-select" onchange="setTheme(this.value)" class="border-main rounded-md text-sm py-1 bg-card text-main focus:ring-primary focus:border-primary">
                         ${Object.keys(themes).map(key => `<option value="${key}" ${state.currentTheme === key ? 'selected' : ''}>${t(themes[key].name)}</option>`).join('')}
                     </select>
                      <label for="lang-select" class="text-sm text-muted"><i class="fas fa-globe"></i></label>
-                    <select id="lang-select" onchange="window.setLanguage(this.value)" class="border-main rounded-md text-sm py-1 bg-card text-main focus:ring-primary focus:border-primary">
+                    <select id="lang-select" onchange="setLanguage(this.value)" class="border-main rounded-md text-sm py-1 bg-card text-main focus:ring-primary focus:border-primary">
                         <option value="id" ${state.currentLang === 'id' ? 'selected' : ''}>ID</option>
                         <option value="en" ${state.currentLang === 'en' ? 'selected' : ''}>EN</option>
                     </select>
@@ -219,10 +201,10 @@
             `;
         }
         
-        function LoginView() {
-            return `
+        function RoleSelectionView() {
+             return `
                 <div class="min-h-screen flex items-center justify-center login-gradient px-4 fade-in">
-                    <div class="w-full max-w-md bg-card rounded-2xl shadow-2xl p-8 space-y-6 relative">
+                    <div class="w-full max-w-md bg-card rounded-2xl shadow-2xl p-8 space-y-8 relative">
                         <div class="absolute top-4 right-4">${CommonSelectors()}</div>
                         <div class="text-center pt-12">
                             <i class="fas fa-hands-helping text-5xl text-primary"></i>
@@ -230,46 +212,90 @@
                             <p class="font-semibold text-muted">${t('school_name')}</p>
                             <p class="text-muted text-sm">${t('app_subtitle')}</p>
                         </div>
-                        <form onsubmit="window.login(event)" class="space-y-4">
-                            <div class="flex justify-center gap-6">
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" name="role" value="siswa" checked onchange="window.toggleLoginInput('siswa')" class="form-radio text-primary focus:ring-primary focus:ring-opacity-50">
-                                    <span class="text-main">${t('role_student')}</span>
-                                </label>
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" name="role" value="konselor" onchange="window.toggleLoginInput('konselor')" class="form-radio text-primary focus:ring-primary focus:ring-opacity-50">
-                                    <span class="text-main">${t('role_counselor')}</span>
-                                </label>
-                            </div>
-                            
-                            <div id="siswa-input-div" class="space-y-4">
-                                <div>
-                                    <label for="name" class="block text-sm font-medium text-main">${t('full_name')}</label>
-                                    <input id="name" type="text" class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('enter_your_name')}">
-                                </div>
-                                <div>
-                                    <label for="student-password" class="block text-sm font-medium text-main">${t('password')}</label>
-                                    <input id="student-password" type="password" class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('enter_password')}">
-                                </div>
-                            </div>
+                        <div class="space-y-4">
+                             <button onclick="navigateTo('login_siswa')" class="w-full py-3 px-4 bg-primary text-on-primary font-semibold rounded-lg shadow-md hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-transform transform hover:scale-105">
+                                <i class="fas fa-user-graduate mr-2"></i> ${t('login_as_student')}
+                            </button>
+                            <button onclick="navigateTo('login_konselor')" class="w-full py-3 px-4 bg-gray-700 text-white font-semibold rounded-lg shadow-md hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-600 transition-transform transform hover:scale-105">
+                                <i class="fas fa-user-tie mr-2"></i> ${t('login_as_counselor')}
+                            </button>
+                            <button onclick="navigateTo('login_admin')" class="w-full py-3 px-4 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-transform transform hover:scale-105">
+                                <i class="fas fa-user-shield mr-2"></i> ${t('login_as_admin')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
 
-                            <div id="konselor-input-div" class="hidden space-y-4">
-                                <div>
-                                    <label for="counselor-select-login" class="block text-sm font-medium text-main">${t('full_name')}</label>
-                                    <select id="counselor-select-login" class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main">
-                                        <option value="">${t('select_counselor')}</option>
-                                        ${counselors.map(c => `<option value="${c.name}">${c.name}</option>`).join('')}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label for="counselor-password" class="block text-sm font-medium text-main">${t('password')}</label>
-                                    <input id="counselor-password" type="password" class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('enter_password')}">
+        function LoginSiswaView() {
+            return `
+                <div class="min-h-screen flex items-center justify-center login-gradient px-4 fade-in">
+                    <div class="w-full max-w-md bg-card rounded-2xl shadow-2xl p-8 space-y-6 relative">
+                         <div class="absolute top-4 left-4">
+                            <button onclick="navigateTo('role_selection')" class="text-muted hover:text-primary font-semibold"><i class="fas fa-arrow-left mr-2"></i>${t('back_to_role_selection')}</button>
+                        </div>
+                        <div class="text-center pt-12">
+                            <i class="fas fa-user-graduate text-5xl text-primary"></i>
+                            <h1 class="text-2xl font-bold text-main mt-4">${t('login_as_student')}</h1>
+                        </div>
+                        <form onsubmit="login(event, 'siswa')" class="space-y-4">
+                            <div>
+                                <label for="name" class="block text-sm font-medium text-main">${t('full_name')}</label>
+                                <input id="name" type="text" class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('enter_your_name')}">
+                            </div>
+                            <div>
+                                <label for="student-password" class="block text-sm font-medium text-main">${t('password')}</label>
+                                <div class="relative mt-1">
+                                    <input id="student-password" type="password" class="w-full px-4 py-2 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('enter_password')}">
+                                    <button type="button" onclick="togglePasswordVisibility('student-password', 'student-pw-icon')" class="absolute inset-y-0 right-0 px-3 flex items-center text-muted">
+                                        <i id="student-pw-icon" class="fas fa-eye"></i>
+                                    </button>
                                 </div>
                             </div>
-
                             <div class="pt-2">
-                                <button type="submit" class="w-full py-3 px-4 bg-primary text-on-primary font-semibold rounded-lg shadow-md hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-transform transform hover:scale-105">
-                                    <i class="fas fa-sign-in-alt mr-2"></i> ${t('login_button')}
+                                <button type="submit" class="w-full py-3 px-4 bg-primary text-on-primary font-semibold rounded-lg shadow-md hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                                    ${t('login_button')}
+                                </button>
+                            </div>
+                        </form>
+                        <p id="login-error" class="text-red-500 text-sm text-center"></p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function LoginKonselorView() {
+             return `
+                <div class="min-h-screen flex items-center justify-center login-gradient px-4 fade-in">
+                    <div class="w-full max-w-md bg-card rounded-2xl shadow-2xl p-8 space-y-6 relative">
+                        <div class="absolute top-4 left-4">
+                            <button onclick="navigateTo('role_selection')" class="text-muted hover:text-primary font-semibold"><i class="fas fa-arrow-left mr-2"></i>${t('back_to_role_selection')}</button>
+                        </div>
+                        <div class="text-center pt-12">
+                            <i class="fas fa-user-tie text-5xl text-primary"></i>
+                             <h1 class="text-2xl font-bold text-main mt-4">${t('login_as_counselor')}</h1>
+                        </div>
+                        <form onsubmit="login(event, 'konselor')" class="space-y-4">
+                             <div>
+                                <label for="counselor-select-login" class="block text-sm font-medium text-main">${t('full_name')}</label>
+                                <select id="counselor-select-login" class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main">
+                                    <option value="">${t('select_counselor')}</option>
+                                    ${state.counselors.map(c => `<option value="${c.name}">${c.name}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label for="counselor-password" class="block text-sm font-medium text-main">${t('password')}</label>
+                                <div class="relative mt-1">
+                                    <input id="counselor-password" type="password" class="w-full px-4 py-2 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('enter_password')}">
+                                    <button type="button" onclick="togglePasswordVisibility('counselor-password', 'counselor-pw-icon')" class="absolute inset-y-0 right-0 px-3 flex items-center text-muted">
+                                        <i id="counselor-pw-icon" class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                             <div class="pt-2">
+                                <button type="submit" class="w-full py-3 px-4 bg-primary text-on-primary font-semibold rounded-lg shadow-md hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                                    ${t('login_button')}
                                 </button>
                             </div>
                         </form>
@@ -279,8 +305,85 @@
             `;
         }
 
+        function LoginAdminView() {
+            return `
+                <div class="min-h-screen flex items-center justify-center login-gradient px-4 fade-in">
+                    <div class="w-full max-w-md bg-card rounded-2xl shadow-2xl p-8 space-y-6 relative">
+                         <div class="absolute top-4 left-4">
+                            <button onclick="navigateTo('role_selection')" class="text-muted hover:text-primary font-semibold"><i class="fas fa-arrow-left mr-2"></i>${t('back_to_role_selection')}</button>
+                        </div>
+                        <div class="text-center pt-12">
+                            <i class="fas fa-user-shield text-5xl text-primary"></i>
+                            <h1 class="text-2xl font-bold text-main mt-4">${t('login_as_admin')}</h1>
+                        </div>
+                        <form onsubmit="login(event, 'admin')" class="space-y-4">
+                            <div>
+                                <label for="admin-username" class="block text-sm font-medium text-main">${t('username')}</label>
+                                <input id="admin-username" type="text" class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('enter_username')}">
+                            </div>
+                            <div>
+                                <label for="admin-password" class="block text-sm font-medium text-main">${t('password')}</label>
+                                <div class="relative mt-1">
+                                    <input id="admin-password" type="password" class="w-full px-4 py-2 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('enter_password')}">
+                                    <button type="button" onclick="togglePasswordVisibility('admin-password', 'admin-pw-icon')" class="absolute inset-y-0 right-0 px-3 flex items-center text-muted">
+                                        <i id="admin-pw-icon" class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="pt-2">
+                                <button type="submit" class="w-full py-3 px-4 bg-primary text-on-primary font-semibold rounded-lg shadow-md hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                                    ${t('login_button')}
+                                </button>
+                            </div>
+                        </form>
+                        <p id="login-error" class="text-red-500 text-sm text-center"></p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function DashboardAdminView() {
+            const content = `
+                <h2 class="text-2xl font-bold text-main mb-6">${t('manage_counselors')}</h2>
+                <div class="grid md:grid-cols-2 gap-8">
+                    <!-- Add Counselor Form -->
+                    <div class="bg-card p-6 rounded-lg shadow">
+                        <h3 class="text-lg font-semibold text-main mb-4">${t('add_new_counselor')}</h3>
+                        <form onsubmit="addCounselor(event)" class="space-y-4">
+                            <div>
+                                <label for="counselor-name" class="block text-sm font-medium text-main">${t('counselor_name')}</label>
+                                <input id="counselor-name" type="text" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main">
+                            </div>
+                            <div>
+                                <label for="counselor-specialty" class="block text-sm font-medium text-main">${t('specialty')}</label>
+                                <input id="counselor-specialty" type="text" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main">
+                            </div>
+                            <button type="submit" class="w-full py-2 px-4 bg-primary text-on-primary font-semibold rounded-lg shadow-md hover:bg-primary-dark">
+                                ${t('add_counselor')}
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Existing Counselors List -->
+                    <div class="bg-card p-6 rounded-lg shadow">
+                        <h3 class="text-lg font-semibold text-main mb-4">${t('existing_counselors')}</h3>
+                        <ul class="space-y-3">
+                            ${state.counselors.map(c => `
+                                <li class="p-3 bg-gray-50 rounded-md border border-main">
+                                    <p class="font-semibold text-main">${c.name}</p>
+                                    <p class="text-sm text-muted">${c.specialty}</p>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                </div>
+            `;
+            return MainLayout(content);
+        }
+
         function MainLayout(content) {
-            const roleText = state.currentUser.role === 'siswa' ? t('role_student') : t('role_counselor');
+            const roleKey = `role_${state.currentUser.role}`;
+            const roleText = t(roleKey);
             return `
                 <div class="min-h-screen">
                     <header class="bg-card shadow-md sticky top-0 z-10">
@@ -299,7 +402,7 @@
                                         <p class="font-semibold text-main">${state.currentUser.name}</p>
                                         <p class="text-sm text-muted">${roleText}</p>
                                     </div>
-                                    <button onclick="window.logout()" class="ml-2 p-2 rounded-full text-muted hover:bg-red-100 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                    <button onclick="logout()" class="ml-2 p-2 rounded-full text-muted hover:bg-red-100 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
                                         <i class="fas fa-sign-out-alt fa-lg"></i>
                                     </button>
                                 </div>
@@ -329,12 +432,12 @@
             const categoryKey = `category_${konsultasi.kategori.toLowerCase().replace(/[\/ ]/g, '_')}`;
             const translatedCategory = t(categoryKey);
             return `
-                <div class="bg-card rounded-xl shadow-lg p-5 hover:shadow-xl transition-shadow duration-300 cursor-pointer" onclick="window.openChat('${konsultasi.id}')">
+                <div class="bg-card rounded-xl shadow-lg p-5 hover:shadow-xl transition-shadow duration-300 cursor-pointer" onclick="openChat(${konsultasi.id})">
                     <div class="flex justify-between items-start">
                         <div>
                             <p class="text-sm text-muted">${translatedCategory}</p>
                             <h3 class="text-lg font-bold text-main">${isKonselor ? konsultasi.siswaName : t('your_consultation')}</h3>
-                            <p class="text-sm text-muted">${isKonselor ? konsultasi.kelas : `ID: #${konsultasi.id.substring(0,5)}`}</p>
+                            <p class="text-sm text-muted">${isKonselor ? konsultasi.kelas : `ID: #${konsultasi.id}`}</p>
                         </div>
                         ${getStatusBadge(konsultasi.status)}
                     </div>
@@ -348,11 +451,11 @@
         }
 
         function DashboardSiswaView() {
-            const myKonsultasi = state.konsultasiData; // Already filtered by Firestore query
+            const myKonsultasi = state.konsultasiData.filter(k => k.siswaName === state.currentUser.name);
             const content = `
                 <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
                     <h2 class="text-2xl font-bold text-main">${t('your_consultation_history')}</h2>
-                    <button onclick="window.openModal('formKonsultasi')" class="bg-primary text-on-primary font-bold py-2 px-4 rounded-lg shadow-md hover:bg-primary-dark transition-transform transform hover:scale-105">
+                    <button onclick="openModal('formKonsultasi')" class="bg-primary text-on-primary font-bold py-2 px-4 rounded-lg shadow-md hover:bg-primary-dark transition-transform transform hover:scale-105">
                         <i class="fas fa-plus mr-2"></i>${t('create_new_consultation')}
                     </button>
                 </div>
@@ -362,7 +465,7 @@
         }
 
         function DashboardKonselorView() {
-            const assignedConsultations = state.konsultasiData; // Already filtered by Firestore query
+            const assignedConsultations = state.konsultasiData.filter(k => k.konselorName === state.currentUser.name);
              const content = `
                 <h2 class="text-2xl font-bold text-main mb-6">${t('consultations_for_you')}</h2>
                 ${assignedConsultations.length > 0 ? `
@@ -381,8 +484,8 @@
         }
         
         function ChatView() {
-            const k = state.konsultasiData.find(k => k.id === state.selectedKonsultasiId);
-            if (!k) return MainLayout('<div class="text-center"><div class="loader mx-auto"></div></div>');
+            const k = state.selectedKonsultasi;
+            if (!k) return '<div>Error: Konsultasi tidak ditemukan.</div>';
             
             const isKonselor = state.currentUser.role === 'konselor';
             const categoryKey = `category_${k.kategori.toLowerCase().replace(/[\/ ]/g, '_')}`;
@@ -392,10 +495,10 @@
             
             const musicPlayer = `
                 <div class="flex items-center gap-2">
-                    <select id="music-select" onchange="window.setMusic(this.value)" class="rounded-lg border-main bg-card text-main focus:ring-primary focus:border-primary text-sm p-1">
+                    <select id="music-select" onchange="setMusic(this.value)" class="rounded-lg border-main bg-card text-main focus:ring-primary focus:border-primary text-sm p-1">
                         ${musicTracks.map(track => `<option value="${track.id}" ${state.currentMusicTrack === track.id ? 'selected' : ''}>${t(track.name)}</option>`).join('')}
                     </select>
-                    <button id="music-btn" onclick="window.toggleMusic()" class="text-muted hover:text-primary text-xl ${state.currentMusicTrack === 'none' ? 'hidden' : ''}">
+                    <button id="music-btn" onclick="toggleMusic()" class="text-muted hover:text-primary text-xl ${state.currentMusicTrack === 'none' ? 'hidden' : ''}">
                         <i class="fas ${state.isMusicPlaying ? 'fa-pause-circle' : 'fa-play-circle'}"></i>
                     </button>
                 </div>
@@ -403,7 +506,7 @@
 
             return MainLayout(`
                 <div>
-                    <button onclick="window.backToDashboard()" class="mb-4 text-primary font-semibold hover:underline">
+                    <button onclick="backToDashboard()" class="mb-4 text-primary font-semibold hover:underline">
                         <i class="fas fa-arrow-left mr-2"></i>${t('back_to_dashboard')}
                     </button>
                     <div class="bg-card rounded-2xl shadow-xl overflow-hidden">
@@ -414,12 +517,12 @@
                             </div>
                             <div class="flex items-center gap-4">
                                 ${musicPlayer}
-                                ${isKonselor && state.currentUser.name === k.konselorName ? `<select id="status-select" onchange="window.updateStatus('${k.id}')" class="rounded-lg border-main bg-card text-main focus:ring-primary focus:border-primary text-sm"><option value="Baru" ${k.status === 'Baru' ? 'selected' : ''}>${t('status_new')}</option><option value="Dalam Proses" ${k.status === 'Dalam Proses' ? 'selected' : ''}>${t('status_in_progress')}</option><option value="Selesai" ${k.status === 'Selesai' ? 'selected' : ''}>${t('status_done')}</option></select>` : getStatusBadge(k.status)}
+                                ${isKonselor && state.currentUser.name === k.konselorName ? `<select id="status-select" onchange="updateStatus(${k.id})" class="rounded-lg border-main bg-card text-main focus:ring-primary focus:border-primary text-sm"><option value="Baru" ${k.status === 'Baru' ? 'selected' : ''}>${t('status_new')}</option><option value="Dalam Proses" ${k.status === 'Dalam Proses' ? 'selected' : ''}>${t('status_in_progress')}</option><option value="Selesai" ${k.status === 'Selesai' ? 'selected' : ''}>${t('status_done')}</option></select>` : getStatusBadge(k.status)}
                             </div>
                         </div>
                         <div class="p-4 border-b border-main"><h4 class="font-semibold mb-2 text-main">${t('initial_problem_desc')}</h4><p class="text-sm bg-yellow-50 text-yellow-900 p-3 rounded-lg">${k.deskripsi}</p></div>
                         <div id="chat-box" class="p-4 h-96 overflow-y-auto space-y-4 flex flex-col">${chatBubbles}</div>
-                        <div class="p-4 border-t border-main"><form onsubmit="window.sendMessage(event, '${k.id}')"><div class="flex items-center gap-2"><input id="chat-input" type="text" class="w-full px-4 py-2 border border-main rounded-full focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('type_your_message')}"><button type="submit" class="bg-primary text-on-primary rounded-full p-3 hover:bg-primary-dark transition"><i class="fas fa-paper-plane"></i></button></div></form></div>
+                        <div class="p-4 border-t border-main"><form onsubmit="sendMessage(event, ${k.id})"><div class="flex items-center gap-2"><input id="chat-input" type="text" class="w-full px-4 py-2 border border-main rounded-full focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('type_your_message')}"><button type="submit" class="bg-primary text-on-primary rounded-full p-3 hover:bg-primary-dark transition"><i class="fas fa-paper-plane"></i></button></div></form></div>
                     </div>
                 </div>`);
         }
@@ -430,8 +533,8 @@
 
         function FormKonsultasiModal() {
             return `
-                <button onclick="window.closeModal()" class="absolute top-4 right-4 text-muted hover:text-main"><i class="fas fa-times fa-lg"></i></button>
-                <form onsubmit="window.submitKonsultasi(event)" class="p-8">
+                <button onclick="closeModal()" class="absolute top-4 right-4 text-muted hover:text-main"><i class="fas fa-times fa-lg"></i></button>
+                <form onsubmit="submitKonsultasi(event)" class="p-8">
                     <h2 class="text-2xl font-bold mb-6 text-center text-main">${t('consultation_form_title')}</h2>
                     <div class="space-y-4">
                         <div><label for="kelas" class="block text-sm font-medium text-main">${t('class')}</label><input id="kelas" type="text" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('class_placeholder')}"></div>
@@ -440,7 +543,7 @@
                             <label for="konselor" class="block text-sm font-medium text-main">${t('choose_counselor')}</label>
                             <select id="konselor" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main">
                                 <option value="">${t('select_counselor')}</option>
-                                ${counselors.map(c => `<option value="${c.name}">${c.name} (${c.specialty})</option>`).join('')}
+                                ${state.counselors.map(c => `<option value="${c.name}">${c.name} (${c.specialty})</option>`).join('')}
                             </select>
                         </div>
                         <div><label for="deskripsi" class="block text-sm font-medium text-main">${t('describe_your_problem')}</label><textarea id="deskripsi" rows="5" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('describe_your_problem_placeholder')}"></textarea></div>
@@ -453,62 +556,62 @@
         function render() {
             const app = document.getElementById('app');
             document.title = `${t('app_title')} - ${t('school_name')}`;
-            
-            if (!state.isAuthReady) {
-                 app.innerHTML = LoadingView();
-                 return;
-            }
 
             switch(state.currentView) {
-                case 'login': app.innerHTML = LoginView(); break;
+                case 'role_selection': app.innerHTML = RoleSelectionView(); break;
+                case 'login_siswa': app.innerHTML = LoginSiswaView(); break;
+                case 'login_konselor': app.innerHTML = LoginKonselorView(); break;
+                case 'login_admin': app.innerHTML = LoginAdminView(); break;
                 case 'dashboard_siswa': app.innerHTML = DashboardSiswaView(); break;
                 case 'dashboard_konselor': app.innerHTML = DashboardKonselorView(); break;
+                case 'dashboard_admin': app.innerHTML = DashboardAdminView(); break;
                 case 'chat':
                     app.innerHTML = ChatView();
                     setTimeout(() => { const chatBox = document.getElementById('chat-box'); if(chatBox) chatBox.scrollTop = chatBox.scrollHeight; }, 0);
                     break;
-                default: app.innerHTML = LoginView();
-            }
-            if (state.currentView === 'login' && typeof window.toggleLoginInput === 'function') {
-                const role = document.querySelector('input[name="role"]:checked')?.value || 'siswa';
-                window.toggleLoginInput(role);
+                default: app.innerHTML = RoleSelectionView();
             }
         }
         
-        window.setTheme = function(themeName) {
+        function navigateTo(view) {
+            state.currentView = view;
+            render();
+        }
+        
+        function setTheme(themeName) {
             const theme = themes[themeName];
             if (!theme) return;
             for (const [key, value] of Object.entries(theme.vars)) {
                 document.documentElement.style.setProperty(key, value);
             }
             state.currentTheme = themeName;
-            render(); 
+            render();
         }
 
-        window.setLanguage = function(lang) {
+        function setLanguage(lang) {
             state.currentLang = lang;
             document.documentElement.lang = lang;
             render();
         }
 
-        window.toggleLoginInput = function(role) {
-            const siswaDiv = document.getElementById('siswa-input-div');
-            const konselorDiv = document.getElementById('konselor-input-div');
-            if (!siswaDiv || !konselorDiv) return;
-            if (role === 'siswa') {
-                siswaDiv.classList.remove('hidden');
-                konselorDiv.classList.add('hidden');
+        function togglePasswordVisibility(inputId, iconId) {
+            const passwordInput = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
             } else {
-                siswaDiv.classList.add('hidden');
-                konselorDiv.classList.remove('hidden');
+                passwordInput.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
             }
         }
 
-        window.login = function(event) {
+        function login(event, role) {
             event.preventDefault();
-            const role = document.querySelector('input[name="role"]:checked').value;
             const errorEl = document.getElementById('login-error');
-            errorEl.textContent = ''; 
+            errorEl.textContent = '';
             let name = '';
 
             if (role === 'siswa') {
@@ -516,25 +619,51 @@
                 const passwordInput = document.getElementById('student-password');
                 name = nameInput.value.trim();
                 const password = passwordInput.value;
-                const correctPassword = '111';
 
                 if (!name) { errorEl.textContent = t('name_required'); return; }
-                if (password !== correctPassword) { errorEl.textContent = t('password_incorrect'); return; }
-            } else { 
-                const counselorSelect = document.getElementById('counselor-select-login');
+                if (password !== '111') { errorEl.textContent = t('password_incorrect'); return; }
+            } else if (role === 'konselor') {
+                const nameSelect = document.getElementById('counselor-select-login');
                 const passwordInput = document.getElementById('counselor-password');
-                name = counselorSelect.value;
+                name = nameSelect.value;
                 const password = passwordInput.value;
-                const correctPassword = '123';
-
                 if (!name) { errorEl.textContent = t('name_required'); return; }
-                if (password !== correctPassword) { errorEl.textContent = t('password_incorrect'); return; }
+                if (password !== '123') { errorEl.textContent = t('password_incorrect'); return; }
+            } else if (role === 'admin') {
+                const usernameInput = document.getElementById('admin-username');
+                const passwordInput = document.getElementById('admin-password');
+                const username = usernameInput.value.trim();
+                const password = passwordInput.value;
+                if (!username) { errorEl.textContent = t('username_required'); return; }
+                if (username.toLowerCase() !== 'admin' || password !== 'admin123') {
+                    errorEl.textContent = t('password_incorrect');
+                    return;
+                }
+                name = 'Admin';
             }
             
             state.currentUser = { name, role };
-            setupRealtimeListeners();
-            state.currentView = role === 'siswa' ? 'dashboard_siswa' : 'dashboard_konselor';
+            state.currentView = `dashboard_${role}`;
             render();
+        }
+        
+        function addCounselor(event) {
+            event.preventDefault();
+            const nameInput = document.getElementById('counselor-name');
+            const specialtyInput = document.getElementById('counselor-specialty');
+            const newName = nameInput.value.trim();
+            const newSpecialty = specialtyInput.value.trim();
+
+            if(newName && newSpecialty) {
+                state.counselors.push({
+                    id: Date.now(),
+                    name: newName,
+                    specialty: newSpecialty
+                });
+                nameInput.value = '';
+                specialtyInput.value = '';
+                render();
+            }
         }
         
         function stopMusic() {
@@ -545,68 +674,51 @@
             state.currentMusicTrack = 'none';
         }
 
-        window.logout = function() {
+        function logout() {
             stopMusic();
-            if (unsubscribe) {
-                unsubscribe();
-                unsubscribe = null;
-            }
             state.currentUser = null;
-            state.konsultasiData = [];
-            state.currentView = 'login';
+            state.currentView = 'role_selection';
             render();
         }
         
-        window.openChat = async function(konsultasiId) {
-            state.selectedKonsultasiId = konsultasiId;
-            const selectedKonsultasi = state.konsultasiData.find(k => k.id === konsultasiId);
-            
-            if (state.currentUser.role === 'konselor' && selectedKonsultasi && selectedKonsultasi.konselorName === state.currentUser.name && selectedKonsultasi.status === 'Baru') {
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                const docRef = doc(db, "artifacts", appId, "public/data/konsultasi", konsultasiId);
-                await updateDoc(docRef, { status: "Dalam Proses" });
+        function openChat(konsultasiId) {
+            state.selectedKonsultasi = state.konsultasiData.find(k => k.id === konsultasiId);
+            if (state.currentUser.role === 'konselor' && state.selectedKonsultasi.konselorName === state.currentUser.name && state.selectedKonsultasi.status === 'Baru') {
+                state.selectedKonsultasi.status = 'Dalam Proses';
             }
             state.currentView = 'chat';
             render();
         }
         
-        window.backToDashboard = function() {
+        function backToDashboard() {
             stopMusic();
-            state.selectedKonsultasiId = null;
-            state.currentView = state.currentUser.role === 'siswa' ? 'dashboard_siswa' : 'dashboard_konselor';
+            state.selectedKonsultasi = null;
+            state.currentView = `dashboard_${state.currentUser.role}`;
             render();
         }
 
-        window.sendMessage = async function(event, konsultasiId) {
+        function sendMessage(event, konsultasiId) {
             event.preventDefault();
             const input = document.getElementById('chat-input');
             const text = input.value.trim();
             if (text) {
                 const konsultasi = state.konsultasiData.find(k => k.id === konsultasiId);
                 if (state.currentUser.name === konsultasi.siswaName || state.currentUser.name === konsultasi.konselorName) {
-                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                    const docRef = doc(db, "artifacts", appId, "public/data/konsultasi", konsultasiId);
-                    await updateDoc(docRef, {
-                        chatHistory: arrayUnion({
-                            sender: state.currentUser.name,
-                            text: text,
-                            timestamp: serverTimestamp()
-                        })
-                    });
+                    konsultasi.chatHistory.push({ sender: state.currentUser.name, text: text });
                     input.value = '';
+                    render();
                 }
             }
         }
         
-        window.updateStatus = async function(konsultasiId) {
+        function updateStatus(konsultasiId) {
             const select = document.getElementById('status-select');
             const newStatus = select.value;
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-            const docRef = doc(db, "artifacts", appId, "public/data/konsultasi", konsultasiId);
-            await updateDoc(docRef, { status: newStatus });
+            const konsultasi = state.konsultasiData.find(k => k.id === konsultasiId);
+            konsultasi.status = newStatus;
         }
 
-        window.setMusic = function(trackId) {
+        function setMusic(trackId) {
             state.currentMusicTrack = trackId;
             const music = document.getElementById('counseling-music');
             const selectedTrack = musicTracks.find(t => t.id === trackId);
@@ -614,7 +726,7 @@
             if (selectedTrack && selectedTrack.src) {
                 music.src = selectedTrack.src;
                 if (state.isMusicPlaying) {
-                    music.play().catch(e => console.error("Audio play failed:", e));
+                    music.play();
                 }
             } else {
                 music.pause();
@@ -624,127 +736,51 @@
             render();
         }
         
-        window.toggleMusic = function() {
+        function toggleMusic() {
             if (state.currentMusicTrack === 'none') return;
             const music = document.getElementById('counseling-music');
             state.isMusicPlaying = !state.isMusicPlaying;
-            if (state.isMusicPlaying) { music.play().catch(e => console.error("Audio play failed:", e)); } else { music.pause(); }
+            if (state.isMusicPlaying) { music.play(); } else { music.pause(); }
             render(); 
         }
 
-        window.openModal = function(modalType) {
+        function openModal(modalType) {
             const modalContainer = document.getElementById('modal-container');
             const modalContent = document.getElementById('modal-content');
             if(modalType === 'formKonsultasi') { modalContent.innerHTML = FormKonsultasiModal(); }
             modalContainer.classList.remove('hidden');
         }
 
-        window.closeModal = function() {
+        function closeModal() {
             const modalContainer = document.getElementById('modal-container');
             modalContainer.classList.add('hidden');
             document.getElementById('modal-content').innerHTML = '';
         }
         
-        window.submitKonsultasi = async function(event) {
+        function submitKonsultasi(event) {
             event.preventDefault();
             const newKonsultasi = {
+                id: Date.now(),
                 siswaName: state.currentUser.name,
                 kelas: document.getElementById('kelas').value,
                 kategori: document.getElementById('kategori').value,
                 konselorName: document.getElementById('konselor').value,
                 deskripsi: document.getElementById('deskripsi').value,
                 status: 'Baru',
-                createdAt: serverTimestamp(),
                 chatHistory: [ { sender: state.currentUser.name, text: document.getElementById('deskripsi').value } ]
             };
-            try {
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                const colRef = collection(db, "artifacts", appId, "public/data/konsultasi");
-                await addDoc(colRef, newKonsultasi);
-                closeModal();
-            } catch (error) {
-                console.error("Error adding document: ", error);
-                alert("Gagal mengirim pengajuan. Silakan coba lagi.");
-            }
-        }
-        
-        function setupRealtimeListeners() {
-            if (unsubscribe) {
-                unsubscribe();
-            }
-            if (!state.currentUser) return;
-
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-            const colRef = collection(db, "artifacts", appId, "public/data/konsultasi");
-            
-            let q;
-            if (state.currentUser.role === 'siswa') {
-                q = query(colRef, where("siswaName", "==", state.currentUser.name));
-            } else { // counselor
-                q = query(colRef, where("konselorName", "==", state.currentUser.name));
-            }
-
-            unsubscribe = onSnapshot(q, (snapshot) => {
-                let consultations = [];
-                snapshot.forEach(doc => {
-                    consultations.push({ ...doc.data(), id: doc.id });
-                });
-                state.konsultasiData = consultations.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-                
-                // If a chat is open, re-render to get new messages
-                if(state.currentView === 'chat') {
-                    const stillExists = state.konsultasiData.some(c => c.id === state.selectedKonsultasiId);
-                    if(!stillExists) {
-                        backToDashboard();
-                    }
-                }
-                render();
-            }, (error) => {
-                console.error("Error listening to consultations: ", error);
-            });
+            state.konsultasiData.unshift(newKonsultasi);
+            closeModal();
+            render();
         }
 
-        async function initFirebase() {
-            try {
-                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-                if (!firebaseConfig) {
-                    throw new Error("Firebase config not found.");
-                }
-
-                app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-
-                onAuthStateChanged(auth, async (user) => {
-                    if (!user) {
-                        try {
-                            const initialToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                            if (initialToken) {
-                                await signInWithCustomToken(auth, initialToken);
-                            } else {
-                                await signInAnonymously(auth);
-                            }
-                        } catch (error) {
-                            console.error("Authentication failed:", error);
-                        }
-                    }
-                    state.isAuthReady = true;
-                    state.currentView = 'login'; // Go to login after auth is ready
-                    render();
-                });
-            } catch (error) {
-                console.error("Firebase initialization failed:", error);
-                document.getElementById('app').innerHTML = `<div class="p-4 text-red-600 bg-red-100">Error: Gagal menginisialisasi database. Konfigurasi tidak ditemukan.</div>`;
-            }
-        }
-        
         // === INITIALIZATION ===
         document.addEventListener('DOMContentLoaded', () => {
-            window.setTheme(state.currentTheme);
-            initFirebase();
+            setTheme(state.currentTheme); 
             render();
         });
 
     </script>
 </body>
 </html>
+

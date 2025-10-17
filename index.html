@@ -989,8 +989,13 @@
 
         async function initFirebase() {
             try {
+                console.log("Attempting to initialize Firebase...");
                 const firebaseConfig = JSON.parse(window.__firebase_config || '{}');
-                if (!firebaseConfig.apiKey) { throw new Error("Firebase config not found."); }
+                if (!firebaseConfig.apiKey) { 
+                    console.error("Firebase config not found or is invalid.");
+                    throw new Error("Firebase config not found."); 
+                }
+                console.log("Firebase config loaded successfully.");
                 
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
@@ -1103,7 +1108,7 @@
             render();
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        window.onload = () => {
              // Attach functions to window object
             window.setTheme = setTheme;
             window.setLanguage = setLanguage;
@@ -1131,7 +1136,8 @@
             initFirebase();
             setTheme(state.currentTheme); 
             render();
-        });
+        };
     </script>
 </body>
 </html>
+

@@ -30,16 +30,12 @@
             color: var(--c-text-main);
             transition: background-color 0.3s, color 0.3s;
         }
-        .fade-in {
-            animation: fadeIn 0.5s ease-in-out;
-        }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(-10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .modal-backdrop {
-            background-color: rgba(0,0,0,0.5);
-        }
+        .modal-backdrop { background-color: rgba(0,0,0,0.5); }
         .bg-primary { background-color: var(--c-primary); }
         .text-primary { color: var(--c-primary); }
         .text-on-primary { color: var(--c-text-on-primary); }
@@ -53,18 +49,41 @@
         .bubble-sent { background-color: var(--c-bubble-sent-bg); color: var(--c-bubble-sent-text); }
         .bubble-received { background-color: var(--c-bubble-received-bg); color: var(--c-bubble-received-text); }
         .login-gradient { background-image: linear-gradient(to bottom right, var(--c-login-grad-from), var(--c-login-grad-to)); }
+        .notification-dot {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 10px;
+            height: 10px;
+            background-color: #ef4444;
+            border-radius: 50%;
+            border: 2px solid var(--c-bg-card);
+        }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800">
+<body class="bg-card">
 
     <div id="app" class="max-w-7xl mx-auto min-h-screen transition-all duration-500">
-        <!-- Halaman akan dirender di sini oleh JS -->
+        <!-- App content is rendered here by JavaScript -->
+    </div>
+    
+    <div id="toast-notification" class="hidden fixed bottom-5 right-5 bg-green-500 text-white py-2 px-4 rounded-lg shadow-lg fade-in">
+        <!-- Toast message here -->
     </div>
     
     <audio id="counseling-music" loop></audio>
+    
+    <script type="module">
+        // Firebase Imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, where, doc, updateDoc, arrayUnion, serverTimestamp, orderBy, getDocs, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    <script>
-        // === TRANSLATION & THEME MANAGEMENT ===
+        let db, auth, app;
+        let unsubscribeConsultations = null;
+        let unsubscribeCounselors = null;
+        let unsubscribeStudents = null;
+
         const translations = {
             app_title: { id: 'e-Counseling', en: 'e-Counseling' },
             app_subtitle: { id: 'Platform Konseling Siswa Digital', en: 'Digital Student Counseling Platform' },
@@ -80,14 +99,17 @@
             name_required: { id: 'Nama tidak boleh kosong.', en: 'Name cannot be empty.' },
             username_required: { id: 'Nama pengguna tidak boleh kosong.', en: 'Username cannot be empty.' },
             password: { id: 'Kata Sandi', en: 'Password' },
+            initial_password: { id: 'Kata Sandi Awal', en: 'Initial Password'},
             enter_password: { id: 'Masukkan kata sandi', en: 'Enter password' },
-            password_incorrect: { id: 'Kata sandi salah.', en: 'Incorrect password.' },
+            password_incorrect: { id: 'Nama pengguna atau kata sandi salah.', en: 'Incorrect username or password.' },
             role_student: { id: 'Siswa', en: 'Student' },
             role_counselor: { id: 'Konselor', en: 'Counselor' },
             role_admin: { id: 'Administrator', en: 'Administrator' },
             your_consultation_history: { id: 'Riwayat Konsultasi Anda', en: 'Your Consultation History' },
             create_new_consultation: { id: 'Buat Konsultasi Baru', en: 'Create New Consultation' },
             no_consultation_yet: { id: 'Belum Ada Konsultasi', en: 'No Consultation Yet' },
+            no_counselor_yet: { id: 'Belum ada konselor terdaftar.', en: 'No counselors registered yet.' },
+            no_student_yet: { id: 'Belum ada siswa terdaftar.', en: 'No students registered yet.' },
             no_consultation_desc: { id: 'Klik "Buat Konsultasi Baru" untuk memulai sesi dengan konselor.', en: 'Click "Create New Consultation" to start a session with a counselor.' },
             student_consultation_list: { id: 'Daftar Konsultasi Siswa', en: 'Student Consultation List' },
             consultations_for_you: { id: 'Konsultasi untuk Anda', en: 'Consultations for You' },
@@ -117,83 +139,77 @@
             choose_counselor: { id: 'Pilih Konselor', en: 'Choose Counselor' },
             select_counselor: { id: 'Pilih seorang konselor', en: 'Select a counselor' },
             send_request: { id: 'Kirim Pengajuan', en: 'Send Request' },
-            theme: { id: 'Tema', en: 'Theme' },
-            theme_default: { id: 'Bawaan', en: 'Default' },
-            theme_tenang: { id: 'Tenang', en: 'Calm' },
-            theme_fokus: { id: 'Fokus', en: 'Focus' },
-            theme_energi: { id: 'Energi', en: 'Energy' },
-            theme_malam: { id: 'Malam', en: 'Night' },
-            music_select: { id: 'Pilih Musik', en: 'Select Music'},
-            music_none: { id: 'Tanpa Musik', en: 'No Music'},
-            music_calm_piano: { id: 'Piano Tenang', en: 'Calm Piano'},
-            music_rain_sounds: { id: 'Suara Hujan', en: 'Rain Sounds'},
-            music_lofi_chill: { id: 'Lofi Chill', en: 'Lofi Chill'},
-            music_forest_sounds: { id: 'Suara Hutan', en: 'Forest Sounds' },
-            music_ocean_waves: { id: 'Deburan Ombak', en: 'Ocean Waves' },
-            music_study_ambient: { id: 'Musik Belajar', en: 'Study Ambient' },
+            all_consultations: { id: 'Semua Riwayat Konsultasi', en: 'All Consultation History' },
+            notification: { id: 'Notifikasi', en: 'Notifications' },
+            new_updates: { id: 'Anda memiliki pembaruan baru!', en: 'You have new updates!' },
+            no_new_updates: { id: 'Tidak ada pembaruan baru.', en: 'No new updates.' },
+            account_settings: { id: 'Pengaturan Akun', en: 'Account Settings' },
+            change_password: { id: 'Ganti Kata Sandi', en: 'Change Password' },
+            current_password: { id: 'Kata Sandi Saat Ini', en: 'Current Password' },
+            new_password: { id: 'Kata Sandi Baru', en: 'New Password' },
+            confirm_new_password: { id: 'Konfirmasi Kata Sandi Baru', en: 'Confirm New Password' },
+            passwords_do_not_match: { id: 'Kata sandi baru tidak cocok.', en: 'New passwords do not match.' },
+            password_changed_success: { id: 'Kata sandi berhasil diubah!', en: 'Password changed successfully!' },
+            priority: { id: 'Prioritas', en: 'Priority' },
+            priority_low: { id: 'Rendah', en: 'Low' },
+            priority_normal: { id: 'Normal', en: 'Normal' },
+            priority_high: { id: 'Tinggi', en: 'High' },
             admin_dashboard: { id: 'Dasbor Admin', en: 'Admin Dashboard' },
             manage_counselors: { id: 'Kelola Guru Konselor', en: 'Manage Counselors' },
             add_new_counselor: { id: 'Tambah Konselor Baru', en: 'Add New Counselor' },
             counselor_name: { id: 'Nama Konselor', en: 'Counselor Name' },
             specialty: { id: 'Spesialisasi (cth: Guru BK)', en: 'Specialty (e.g., School Counselor)' },
             add_counselor: { id: 'Tambah Konselor', en: 'Add Counselor' },
-            existing_counselors: { id: 'Daftar Konselor Saat Ini', en: 'Current Counselor List' }
+            existing_counselors: { id: 'Daftar Konselor Saat Ini', en: 'Current Counselor List' },
+            manage_students: { id: 'Kelola Akun Siswa', en: 'Manage Student Accounts'},
+            add_new_student: { id: 'Tambah Siswa Baru', en: 'Add New Student'},
+            add_student: { id: 'Tambah Siswa', en: 'Add Student' },
+            existing_students: { id: 'Daftar Siswa Saat Ini', en: 'Current Student List'},
+            reset_password: { id: 'Reset Password', en: 'Reset Password'},
+            delete: { id: 'Hapus', en: 'Delete'},
+            confirm_action: { id: 'Konfirmasi Tindakan', en: 'Confirm Action'},
+            yes_continue: { id: 'Ya, Lanjutkan', en: 'Yes, Continue'},
+            no_cancel: { id: 'Tidak, Batalkan', en: 'No, Cancel'},
         };
         
         const themes = {
-            default: { name: 'theme_default', vars: { '--c-primary': '#4f46e5', '--c-primary-dark': '#4338ca', '--c-bg-app': '#f3f4f6', '--c-bg-card': '#ffffff', '--c-text-main': '#1f2937', '--c-text-muted': '#6b7280', '--c-text-on-primary': '#ffffff', '--c-border': '#d1d5db', '--c-bubble-sent-bg': '#4f46e5', '--c-bubble-sent-text': '#ffffff', '--c-bubble-received-bg': '#e5e7eb', '--c-bubble-received-text': '#1f2937', '--c-login-grad-from': '#3b82f6', '--c-login-grad-to': '#6366f1' }},
-            tenang: { name: 'theme_tenang', vars: { '--c-primary': '#0d9488', '--c-primary-dark': '#0f766e', '--c-bg-app': '#f0fdfa', '--c-bg-card': '#ffffff', '--c-text-main': '#1f2937', '--c-text-muted': '#57534e', '--c-text-on-primary': '#ffffff', '--c-border': '#d1d5db', '--c-bubble-sent-bg': '#0d9488', '--c-bubble-sent-text': '#ffffff', '--c-bubble-received-bg': '#dcfce7', '--c-bubble-received-text': '#1f2937', '--c-login-grad-from': '#5eead4', '--c-login-grad-to': '#2dd4bf' }},
-            fokus: { name: 'theme_fokus', vars: { '--c-primary': '#818cf8', '--c-primary-dark': '#6366f1', '--c-bg-app': '#111827', '--c-bg-card': '#1f2937', '--c-text-main': '#f9fafb', '--c-text-muted': '#9ca3af', '--c-text-on-primary': '#111827', '--c-border': '#374151', '--c-bubble-sent-bg': '#818cf8', '--c-bubble-sent-text': '#111827', '--c-bubble-received-bg': '#374151', '--c-bubble-received-text': '#f9fafb', '--c-login-grad-from': '#1e293b', '--c-login-grad-to': '#0f172a' }},
-            energi: { name: 'theme_energi', vars: { '--c-primary': '#f97316', '--c-primary-dark': '#ea580c', '--c-bg-app': '#fff7ed', '--c-bg-card': '#ffffff', '--c-text-main': '#1c1917', '--c-text-muted': '#57534e', '--c-text-on-primary': '#ffffff', '--c-border': '#e7e5e4', '--c-bubble-sent-bg': '#f97316', '--c-bubble-sent-text': '#ffffff', '--c-bubble-received-bg': '#ffedd5', '--c-bubble-received-text': '#1c1917', '--c-login-grad-from': '#fb923c', '--c-login-grad-to': '#f59e0b' }},
-            malam: { name: 'theme_malam', vars: { '--c-primary': '#ec4899', '--c-primary-dark': '#db2777', '--c-bg-app': '#1e1b4b', '--c-bg-card': '#312e81', '--c-text-main': '#e0e7ff', '--c-text-muted': '#a5b4fc', '--c-text-on-primary': '#ffffff', '--c-border': '#4338ca', '--c-bubble-sent-bg': '#ec4899', '--c-bubble-sent-text': '#ffffff', '--c-bubble-received-bg': '#4338ca', '--c-bubble-received-text': '#e0e7ff', '--c-login-grad-from': '#312e81', '--c-login-grad-to': '#1e1b4b' }}
+            default: { name: 'Bawaan', vars: { '--c-primary': '#4f46e5', '--c-primary-dark': '#4338ca', '--c-bg-app': '#f3f4f6', '--c-bg-card': '#ffffff', '--c-text-main': '#1f2937', '--c-text-muted': '#6b7280', '--c-text-on-primary': '#ffffff', '--c-border': '#d1d5db', '--c-bubble-sent-bg': '#4f46e5', '--c-bubble-sent-text': '#ffffff', '--c-bubble-received-bg': '#e5e7eb', '--c-bubble-received-text': '#1f2937', '--c-login-grad-from': '#3b82f6', '--c-login-grad-to': '#6366f1' }},
+            tenang: { name: 'Tenang', vars: { '--c-primary': '#0d9488', '--c-primary-dark': '#0f766e', '--c-bg-app': '#f0fdfa', '--c-bg-card': '#ffffff', '--c-text-main': '#1f2937', '--c-text-muted': '#57534e', '--c-text-on-primary': '#ffffff', '--c-border': '#d1d5db', '--c-bubble-sent-bg': '#0d9488', '--c-bubble-sent-text': '#ffffff', '--c-bubble-received-bg': '#dcfce7', '--c-bubble-received-text': '#1f2937', '--c-login-grad-from': '#5eead4', '--c-login-grad-to': '#2dd4bf' }},
+            fokus: { name: 'Fokus', vars: { '--c-primary': '#818cf8', '--c-primary-dark': '#6366f1', '--c-bg-app': '#111827', '--c-bg-card': '#1f2937', '--c-text-main': '#f9fafb', '--c-text-muted': '#9ca3af', '--c-text-on-primary': '#111827', '--c-border': '#374151', '--c-bubble-sent-bg': '#818cf8', '--c-bubble-sent-text': '#111827', '--c-bubble-received-bg': '#374151', '--c-bubble-received-text': '#f9fafb', '--c-login-grad-from': '#1e293b', '--c-login-grad-to': '#0f172a' }},
         };
 
         const musicTracks = [
-            { id: 'none', name: 'music_none', src: '' },
-            { id: 'calm_piano', name: 'music_calm_piano', src: 'https://cdn.pixabay.com/download/audio/2022/10/19/audio_b2810a9fce.mp3' },
-            { id: 'rain_sounds', name: 'music_rain_sounds', src: 'https://cdn.pixabay.com/download/audio/2022/08/16/audio_394a6dce6a.mp3' },
-            { id: 'lofi_chill', name: 'music_lofi_chill', src: 'https://cdn.pixabay.com/download/audio/2022/02/07/audio_c3a535e3d7.mp3' },
-            { id: 'forest_sounds', name: 'music_forest_sounds', src: 'https://cdn.pixabay.com/download/audio/2022/08/23/audio_13d77f329c.mp3' },
-            { id: 'ocean_waves', name: 'music_ocean_waves', src: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_73c9c6474b.mp3' },
-            { id: 'study_ambient', name: 'music_study_ambient', src: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1b6234326f.mp3' }
+            { id: 'none', name: 'Tanpa Musik', src: '' },
+            { id: 'calm_piano', name: 'Piano Tenang', src: 'https://cdn.pixabay.com/download/audio/2022/10/19/audio_b2810a9fce.mp3' },
         ];
 
-        function t(key) {
-            return translations[key] ? (translations[key][state.currentLang] || translations[key]['id']) : key;
-        }
+        function t(key) { return translations[key] ? (translations[key][state.currentLang] || translations[key]['id']) : key; }
 
-        // === STATE MANAGEMENT ===
         const state = {
-            currentView: 'role_selection', 
+            currentView: 'role_selection',
             currentUser: null,
             selectedKonsultasi: null,
             currentLang: 'id',
             currentTheme: 'default',
             isMusicPlaying: false,
             currentMusicTrack: 'none',
-            counselors: [
-                { id: 1, name: 'Dra. Heti Supriati', specialty: 'Guru BK' },
-                { id: 2, name: 'Dra. Imas Aliah, M.Pd.', specialty: 'Guru BK' },
-                { id: 3, name: 'Dra. Ai Soraya', specialty: 'Guru BK' },
-                { id: 4, name: 'Tazkiyatul Aini, S.Pd.', specialty: 'Guru BK' }
-            ],
-            konsultasiData: [
-                { id: 1, siswaName: 'Budi Santoso', kelas: 'XII IPA 1', kategori: 'Karir', deskripsi: 'Saya merasa bingung memilih jurusan kuliah, antara Teknik Informatika dan Desain Grafis.', status: 'Selesai', konselorName: 'Dra. Imas Aliah, M.Pd.', chatHistory: [{ sender: 'Budi Santoso', text: 'Assalamualaikum Bu...' }, { sender: 'Dra. Imas Aliah, M.Pd.', text: 'Waalaikumsalam Budi...' }] },
-                { id: 2, siswaName: 'Citra Lestari', kelas: 'XI IPS 3', kategori: 'Pribadi/Sosial', deskripsi: 'Akhir-akhir ini saya merasa kesulitan bergaul dengan teman-teman sekelas.', status: 'Dalam Proses', konselorName: 'Tazkiyatul Aini, S.Pd.', chatHistory: [{ sender: 'Citra Lestari', text: 'Selamat pagi, Bu...' }, { sender: 'Tazkiyatul Aini, S.Pd.', text: 'Selamat pagi, Citra...' }] },
-                { id: 3, siswaName: 'Doni Firmansyah', kelas: 'X-2', kategori: 'Akademik', deskripsi: 'Saya kesulitan mengatur waktu antara belajar dan kegiatan ekstrakurikuler.', status: 'Baru', konselorName: 'Dra. Heti Supriati', chatHistory: [{ sender: 'Doni Firmansyah', text: 'Assalamualaikum Bu...' }] }
-            ],
+            counselors: [],
+            students: [],
+            konsultasiData: [],
+            hasNewNotification: false,
+            isAuthReady: false,
         };
 
-        // === TEMPLATES / COMPONENTS ===
+        // === TEMPLATES / VIEWS ===
         function CommonSelectors() {
             return `
                 <div class="flex items-center gap-2">
                     <label for="theme-select" class="text-sm text-muted"><i class="fas fa-palette"></i></label>
-                    <select id="theme-select" onchange="setTheme(this.value)" class="border-main rounded-md text-sm py-1 bg-card text-main focus:ring-primary focus:border-primary">
-                        ${Object.keys(themes).map(key => `<option value="${key}" ${state.currentTheme === key ? 'selected' : ''}>${t(themes[key].name)}</option>`).join('')}
+                    <select id="theme-select" onchange="window.setTheme(this.value)" class="border-main rounded-md text-sm py-1 bg-card text-main focus:ring-primary focus:border-primary">
+                        ${Object.keys(themes).map(key => `<option value="${key}" ${state.currentTheme === key ? 'selected' : ''}>${themes[key].name}</option>`).join('')}
                     </select>
                      <label for="lang-select" class="text-sm text-muted"><i class="fas fa-globe"></i></label>
-                    <select id="lang-select" onchange="setLanguage(this.value)" class="border-main rounded-md text-sm py-1 bg-card text-main focus:ring-primary focus:border-primary">
+                    <select id="lang-select" onchange="window.setLanguage(this.value)" class="border-main rounded-md text-sm py-1 bg-card text-main focus:ring-primary focus:border-primary">
                         <option value="id" ${state.currentLang === 'id' ? 'selected' : ''}>ID</option>
                         <option value="en" ${state.currentLang === 'en' ? 'selected' : ''}>EN</option>
                     </select>
@@ -213,13 +229,13 @@
                             <p class="text-muted text-sm">${t('app_subtitle')}</p>
                         </div>
                         <div class="space-y-4">
-                             <button onclick="navigateTo('login_siswa')" class="w-full py-3 px-4 bg-primary text-on-primary font-semibold rounded-lg shadow-md hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-transform transform hover:scale-105">
+                             <button onclick="window.navigateTo('login_siswa')" class="w-full py-3 px-4 bg-primary text-on-primary font-semibold rounded-lg shadow-md hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-transform transform hover:scale-105">
                                 <i class="fas fa-user-graduate mr-2"></i> ${t('login_as_student')}
                             </button>
-                            <button onclick="navigateTo('login_konselor')" class="w-full py-3 px-4 bg-gray-700 text-white font-semibold rounded-lg shadow-md hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-600 transition-transform transform hover:scale-105">
+                            <button onclick="window.navigateTo('login_konselor')" class="w-full py-3 px-4 bg-gray-700 text-white font-semibold rounded-lg shadow-md hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-600 transition-transform transform hover:scale-105">
                                 <i class="fas fa-user-tie mr-2"></i> ${t('login_as_counselor')}
                             </button>
-                            <button onclick="navigateTo('login_admin')" class="w-full py-3 px-4 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-transform transform hover:scale-105">
+                            <button onclick="window.navigateTo('login_admin')" class="w-full py-3 px-4 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-transform transform hover:scale-105">
                                 <i class="fas fa-user-shield mr-2"></i> ${t('login_as_admin')}
                             </button>
                         </div>
@@ -233,22 +249,22 @@
                 <div class="min-h-screen flex items-center justify-center login-gradient px-4 fade-in">
                     <div class="w-full max-w-md bg-card rounded-2xl shadow-2xl p-8 space-y-6 relative">
                          <div class="absolute top-4 left-4">
-                            <button onclick="navigateTo('role_selection')" class="text-muted hover:text-primary font-semibold"><i class="fas fa-arrow-left mr-2"></i>${t('back_to_role_selection')}</button>
+                            <button onclick="window.navigateTo('role_selection')" class="text-muted hover:text-primary font-semibold"><i class="fas fa-arrow-left mr-2"></i>${t('back_to_role_selection')}</button>
                         </div>
                         <div class="text-center pt-12">
                             <i class="fas fa-user-graduate text-5xl text-primary"></i>
                             <h1 class="text-2xl font-bold text-main mt-4">${t('login_as_student')}</h1>
                         </div>
-                        <form onsubmit="login(event, 'siswa')" class="space-y-4">
+                        <form onsubmit="window.login(event, 'siswa')" class="space-y-4">
                             <div>
-                                <label for="name" class="block text-sm font-medium text-main">${t('full_name')}</label>
-                                <input id="name" type="text" class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('enter_your_name')}">
+                                <label for="name" class="block text-sm font-medium text-main">${t('username')}</label>
+                                <input id="name" type="text" class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('enter_username')}">
                             </div>
                             <div>
                                 <label for="student-password" class="block text-sm font-medium text-main">${t('password')}</label>
                                 <div class="relative mt-1">
                                     <input id="student-password" type="password" class="w-full px-4 py-2 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('enter_password')}">
-                                    <button type="button" onclick="togglePasswordVisibility('student-password', 'student-pw-icon')" class="absolute inset-y-0 right-0 px-3 flex items-center text-muted">
+                                    <button type="button" onclick="window.togglePasswordVisibility('student-password', 'student-pw-icon')" class="absolute inset-y-0 right-0 px-3 flex items-center text-muted">
                                         <i id="student-pw-icon" class="fas fa-eye"></i>
                                     </button>
                                 </div>
@@ -270,13 +286,13 @@
                 <div class="min-h-screen flex items-center justify-center login-gradient px-4 fade-in">
                     <div class="w-full max-w-md bg-card rounded-2xl shadow-2xl p-8 space-y-6 relative">
                         <div class="absolute top-4 left-4">
-                            <button onclick="navigateTo('role_selection')" class="text-muted hover:text-primary font-semibold"><i class="fas fa-arrow-left mr-2"></i>${t('back_to_role_selection')}</button>
+                            <button onclick="window.navigateTo('role_selection')" class="text-muted hover:text-primary font-semibold"><i class="fas fa-arrow-left mr-2"></i>${t('back_to_role_selection')}</button>
                         </div>
                         <div class="text-center pt-12">
                             <i class="fas fa-user-tie text-5xl text-primary"></i>
                              <h1 class="text-2xl font-bold text-main mt-4">${t('login_as_counselor')}</h1>
                         </div>
-                        <form onsubmit="login(event, 'konselor')" class="space-y-4">
+                        <form onsubmit="window.login(event, 'konselor')" class="space-y-4">
                              <div>
                                 <label for="counselor-select-login" class="block text-sm font-medium text-main">${t('full_name')}</label>
                                 <select id="counselor-select-login" class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main">
@@ -288,7 +304,7 @@
                                 <label for="counselor-password" class="block text-sm font-medium text-main">${t('password')}</label>
                                 <div class="relative mt-1">
                                     <input id="counselor-password" type="password" class="w-full px-4 py-2 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('enter_password')}">
-                                    <button type="button" onclick="togglePasswordVisibility('counselor-password', 'counselor-pw-icon')" class="absolute inset-y-0 right-0 px-3 flex items-center text-muted">
+                                    <button type="button" onclick="window.togglePasswordVisibility('counselor-password', 'counselor-pw-icon')" class="absolute inset-y-0 right-0 px-3 flex items-center text-muted">
                                         <i id="counselor-pw-icon" class="fas fa-eye"></i>
                                     </button>
                                 </div>
@@ -310,13 +326,13 @@
                 <div class="min-h-screen flex items-center justify-center login-gradient px-4 fade-in">
                     <div class="w-full max-w-md bg-card rounded-2xl shadow-2xl p-8 space-y-6 relative">
                          <div class="absolute top-4 left-4">
-                            <button onclick="navigateTo('role_selection')" class="text-muted hover:text-primary font-semibold"><i class="fas fa-arrow-left mr-2"></i>${t('back_to_role_selection')}</button>
+                            <button onclick="window.navigateTo('role_selection')" class="text-muted hover:text-primary font-semibold"><i class="fas fa-arrow-left mr-2"></i>${t('back_to_role_selection')}</button>
                         </div>
                         <div class="text-center pt-12">
                             <i class="fas fa-user-shield text-5xl text-primary"></i>
                             <h1 class="text-2xl font-bold text-main mt-4">${t('login_as_admin')}</h1>
                         </div>
-                        <form onsubmit="login(event, 'admin')" class="space-y-4">
+                        <form onsubmit="window.login(event, 'admin')" class="space-y-4">
                             <div>
                                 <label for="admin-username" class="block text-sm font-medium text-main">${t('username')}</label>
                                 <input id="admin-username" type="text" class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('enter_username')}">
@@ -325,7 +341,7 @@
                                 <label for="admin-password" class="block text-sm font-medium text-main">${t('password')}</label>
                                 <div class="relative mt-1">
                                     <input id="admin-password" type="password" class="w-full px-4 py-2 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('enter_password')}">
-                                    <button type="button" onclick="togglePasswordVisibility('admin-password', 'admin-pw-icon')" class="absolute inset-y-0 right-0 px-3 flex items-center text-muted">
+                                    <button type="button" onclick="window.togglePasswordVisibility('admin-password', 'admin-pw-icon')" class="absolute inset-y-0 right-0 px-3 flex items-center text-muted">
                                         <i id="admin-pw-icon" class="fas fa-eye"></i>
                                     </button>
                                 </div>
@@ -344,37 +360,37 @@
 
         function DashboardAdminView() {
             const content = `
-                <h2 class="text-2xl font-bold text-main mb-6">${t('manage_counselors')}</h2>
-                <div class="grid md:grid-cols-2 gap-8">
-                    <!-- Add Counselor Form -->
-                    <div class="bg-card p-6 rounded-lg shadow">
-                        <h3 class="text-lg font-semibold text-main mb-4">${t('add_new_counselor')}</h3>
-                        <form onsubmit="addCounselor(event)" class="space-y-4">
-                            <div>
-                                <label for="counselor-name" class="block text-sm font-medium text-main">${t('counselor_name')}</label>
-                                <input id="counselor-name" type="text" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main">
-                            </div>
-                            <div>
-                                <label for="counselor-specialty" class="block text-sm font-medium text-main">${t('specialty')}</label>
-                                <input id="counselor-specialty" type="text" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main">
-                            </div>
-                            <button type="submit" class="w-full py-2 px-4 bg-primary text-on-primary font-semibold rounded-lg shadow-md hover:bg-primary-dark">
-                                ${t('add_counselor')}
-                            </button>
-                        </form>
+                <div class="grid lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-1 space-y-8">
+                         <div class="bg-card p-6 rounded-lg shadow">
+                            <h3 class="text-lg font-semibold text-main mb-4">${t('manage_counselors')}</h3>
+                            <form onsubmit="window.addCounselor(event)" class="space-y-4">
+                                <div><label for="counselor-name" class="block text-sm font-medium text-main">${t('counselor_name')}</label><input id="counselor-name" type="text" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main"></div>
+                                <div><label for="counselor-specialty" class="block text-sm font-medium text-main">${t('specialty')}</label><input id="counselor-specialty" type="text" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main"></div>
+                                <div><label for="counselor-password" class="block text-sm font-medium text-main">${t('password')}</label><input id="counselor-password" type="text" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main"></div>
+                                <button type="submit" class="w-full py-2 px-4 bg-primary text-on-primary font-semibold rounded-lg shadow-md hover:bg-primary-dark">${t('add_counselor')}</button>
+                            </form>
+                             <h3 class="text-lg font-semibold text-main mt-6 mb-4">${t('existing_counselors')}</h3>
+                            <ul class="space-y-3 max-h-48 overflow-y-auto">${state.counselors.map(c => `<li class="p-3 bg-gray-50 rounded-md border border-main"><div class="flex justify-between items-start"><div><p class="font-semibold text-main">${c.name}</p><p class="text-sm text-muted">${c.specialty}</p></div><div class="flex flex-col gap-2 items-end"><button onclick="window.resetCounselorPassword('${c.id}', '${c.name}')" class="px-2 py-1 text-xs font-medium text-white bg-yellow-500 rounded hover:bg-yellow-600">${t('reset_password')}</button><button onclick="window.deleteCounselor('${c.id}', '${c.name}')" class="px-2 py-1 text-xs font-medium text-white bg-red-500 rounded hover:bg-red-600">${t('delete')}</button></div></div></li>`).join('') || `<p class="text-muted text-sm">${t('no_counselor_yet')}</p>`}</ul>
+                        </div>
+                        <div class="bg-card p-6 rounded-lg shadow">
+                            <h3 class="text-lg font-semibold text-main mb-4">${t('manage_students')}</h3>
+                             <form onsubmit="window.addStudent(event)" class="space-y-4">
+                                <div><label for="student-fullname" class="block text-sm font-medium text-main">${t('full_name')}</label><input id="student-fullname" type="text" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main"></div>
+                                <div><label for="student-username" class="block text-sm font-medium text-main">${t('username')}</label><input id="student-username" type="text" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main"></div>
+                                <div><label for="student-initial-password" class="block text-sm font-medium text-main">${t('initial_password')}</label><input id="student-initial-password" type="text" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main"></div>
+                                <div><label for="student-class" class="block text-sm font-medium text-main">${t('class')}</label><input id="student-class" type="text" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main"></div>
+                                <button type="submit" class="w-full py-2 px-4 bg-primary text-on-primary font-semibold rounded-lg shadow-md hover:bg-primary-dark">${t('add_student')}</button>
+                            </form>
+                             <h3 class="text-lg font-semibold text-main mt-6 mb-4">${t('existing_students')}</h3>
+                            <ul class="space-y-3 max-h-48 overflow-y-auto">${state.students.map(s => `<li class="p-3 bg-gray-50 rounded-md border border-main"><div class="flex justify-between items-start"><div><p class="font-semibold text-main">${s.fullName}</p><p class="text-sm text-muted">${s.username} | ${s.kelas}</p></div><div class="flex gap-2"><button onclick="window.resetStudentPassword('${s.id}', '${s.fullName}')" class="px-2 py-1 text-xs font-medium text-white bg-yellow-500 rounded hover:bg-yellow-600">${t('reset_password')}</button><button onclick="window.deleteStudent('${s.id}', '${s.fullName}')" class="px-2 py-1 text-xs font-medium text-white bg-red-500 rounded hover:bg-red-600">${t('delete')}</button></div></div></li>`).join('') || `<p class="text-muted text-sm">${t('no_student_yet')}</p>`}</ul>
+                        </div>
                     </div>
-
-                    <!-- Existing Counselors List -->
-                    <div class="bg-card p-6 rounded-lg shadow">
-                        <h3 class="text-lg font-semibold text-main mb-4">${t('existing_counselors')}</h3>
-                        <ul class="space-y-3">
-                            ${state.counselors.map(c => `
-                                <li class="p-3 bg-gray-50 rounded-md border border-main">
-                                    <p class="font-semibold text-main">${c.name}</p>
-                                    <p class="text-sm text-muted">${c.specialty}</p>
-                                </li>
-                            `).join('')}
-                        </ul>
+                    <div class="lg:col-span-2 bg-card p-6 rounded-lg shadow">
+                        <h3 class="text-lg font-semibold text-main mb-4">${t('all_consultations')}</h3>
+                        <div class="space-y-4 max-h-[85vh] overflow-y-auto">
+                            ${state.konsultasiData.length > 0 ? state.konsultasiData.map(KonsultasiCard).join('') : `<p class="text-muted">${t('no_consultation_yet')}</p>`}
+                        </div>
                     </div>
                 </div>
             `;
@@ -398,11 +414,18 @@
                                 </div>
                                 <div class="flex items-center gap-4">
                                      ${CommonSelectors()}
+                                     <div class="relative">
+                                        <button onclick="window.showNotification()" class="p-2 rounded-full text-muted hover:text-primary focus:outline-none">
+                                            <i class="fas fa-bell fa-lg"></i>
+                                            ${state.hasNewNotification ? '<span class="notification-dot"></span>' : ''}
+                                        </button>
+                                     </div>
                                     <div class="text-right">
-                                        <p class="font-semibold text-main">${state.currentUser.name}</p>
+                                        <p class="font-semibold text-main">${state.currentUser.fullName || state.currentUser.name}</p>
                                         <p class="text-sm text-muted">${roleText}</p>
                                     </div>
-                                    <button onclick="logout()" class="ml-2 p-2 rounded-full text-muted hover:bg-red-100 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                    ${state.currentUser.role === 'siswa' ? `<button onclick="window.openModal('changePassword')" class="ml-2 p-2 rounded-full text-muted hover:text-primary"><i class="fas fa-cog"></i></button>` : ''}
+                                    <button onclick="window.logout()" class="ml-2 p-2 rounded-full text-muted hover:bg-red-100 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
                                         <i class="fas fa-sign-out-alt fa-lg"></i>
                                     </button>
                                 </div>
@@ -427,35 +450,51 @@
             }
         }
         
+        function getPriorityBadge(priority) {
+            if (priority === 'Tinggi') {
+                return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">${t('priority_high')}</span>`;
+            } else if (priority === 'Normal') {
+                return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">${t('priority_normal')}</span>`;
+            } else if (priority === 'Rendah') {
+                return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">${t('priority_low')}</span>`;
+            }
+            return '';
+        }
+        
         function KonsultasiCard(konsultasi) {
-            const isKonselor = state.currentUser.role === 'konselor';
-            const categoryKey = `category_${konsultasi.kategori.toLowerCase().replace(/[\/ ]/g, '_')}`;
+            const isCounselor = state.currentUser.role === 'konselor';
+            const isAdmin = state.currentUser.role === 'admin';
+            const categoryKey = `category_${(konsultasi.kategori || '').toLowerCase().replace(/[\/ ]/g, '_')}`;
             const translatedCategory = t(categoryKey);
+            
             return `
-                <div class="bg-card rounded-xl shadow-lg p-5 hover:shadow-xl transition-shadow duration-300 cursor-pointer" onclick="openChat(${konsultasi.id})">
+                <div class="bg-card rounded-xl shadow-lg p-5 hover:shadow-xl transition-shadow duration-300 cursor-pointer" onclick="window.openChat('${konsultasi.id}')">
                     <div class="flex justify-between items-start">
                         <div>
                             <p class="text-sm text-muted">${translatedCategory}</p>
-                            <h3 class="text-lg font-bold text-main">${isKonselor ? konsultasi.siswaName : t('your_consultation')}</h3>
-                            <p class="text-sm text-muted">${isKonselor ? konsultasi.kelas : `ID: #${konsultasi.id}`}</p>
+                            <h3 class="text-lg font-bold text-main">${isCounselor || isAdmin ? konsultasi.siswaName : t('your_consultation')}</h3>
+                            <p class="text-sm text-muted">${isCounselor || isAdmin ? konsultasi.kelas : `ID: #${(konsultasi.id || '').substring(0,5)}`}</p>
                         </div>
-                        ${getStatusBadge(konsultasi.status)}
+                        <div class="flex flex-col items-end gap-2">
+                             ${getStatusBadge(konsultasi.status)}
+                             ${getPriorityBadge(konsultasi.priority)}
+                        </div>
                     </div>
                     <p class="mt-3 text-muted text-sm line-clamp-2">${konsultasi.deskripsi}</p>
                     <div class="mt-4 pt-4 border-t border-main flex justify-between items-center text-xs text-muted">
                         <span>${t('counselor')}: ${konsultasi.konselorName || t('not_assigned')}</span>
-                        <span class="flex items-center"><i class="far fa-comments mr-1"></i> ${konsultasi.chatHistory.length} ${t('messages')}</span>
+                        <span class="flex items-center"><i class="far fa-comments mr-1"></i> ${(konsultasi.chatHistory || []).length} ${t('messages')}</span>
                     </div>
                 </div>
             `;
         }
 
         function DashboardSiswaView() {
-            const myKonsultasi = state.konsultasiData.filter(k => k.siswaName === state.currentUser.name);
+            const myKonsultasi = state.konsultasiData;
             const content = `
                 <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
                     <h2 class="text-2xl font-bold text-main">${t('your_consultation_history')}</h2>
-                    <button onclick="openModal('formKonsultasi')" class="bg-primary text-on-primary font-bold py-2 px-4 rounded-lg shadow-md hover:bg-primary-dark transition-transform transform hover:scale-105">
+                    <button onclick="window.openModal('formKonsultasi')" class="bg-primary text-on-primary font-bold py-2 px-4 rounded-lg shadow-md hover:bg-primary-dark transition-transform transform hover:scale-105">
                         <i class="fas fa-plus mr-2"></i>${t('create_new_consultation')}
                     </button>
                 </div>
@@ -465,7 +504,7 @@
         }
 
         function DashboardKonselorView() {
-            const assignedConsultations = state.konsultasiData.filter(k => k.konselorName === state.currentUser.name);
+            const assignedConsultations = state.konsultasiData;
              const content = `
                 <h2 class="text-2xl font-bold text-main mb-6">${t('consultations_for_you')}</h2>
                 ${assignedConsultations.length > 0 ? `
@@ -483,30 +522,31 @@
             return MainLayout(content);
         }
         
-        function ChatView() {
-            const k = state.selectedKonsultasi;
-            if (!k) return '<div>Error: Konsultasi tidak ditemukan.</div>';
-            
-            const isKonselor = state.currentUser.role === 'konselor';
-            const categoryKey = `category_${k.kategori.toLowerCase().replace(/[\/ ]/g, '_')}`;
+        function ChatView(k) {
+            const isCounselor = state.currentUser.role === 'konselor';
+            const isAdmin = state.currentUser.role === 'admin';
+            const categoryKey = `category_${(k.kategori || '').toLowerCase().replace(/[\/ ]/g, '_')}`;
             const translatedCategory = t(categoryKey);
 
-            const chatBubbles = k.chatHistory.map(chat => `<div class="chat ${chat.sender === state.currentUser.name ? 'chat-end' : 'chat-start'}"><div class="chat-header text-xs text-muted mb-1">${chat.sender}</div><div class="chat-bubble ${chat.sender === state.currentUser.name ? 'bubble-sent' : 'bubble-received'}">${chat.text}</div></div>`).join('');
+            let priorityDisplay;
+            if (isCounselor) {
+                priorityDisplay = `
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm font-medium text-main">${t('priority')}:</label>
+                        <select onchange="window.updatePriority('${k.id}', this.value)" class="rounded-lg border-main bg-card text-main focus:ring-primary focus:border-primary text-sm">
+                            <option value="Rendah" ${k.priority === 'Rendah' ? 'selected' : ''}>${t('priority_low')}</option>
+                            <option value="Normal" ${k.priority === 'Normal' || !k.priority ? 'selected' : ''}>${t('priority_normal')}</option>
+                            <option value="Tinggi" ${k.priority === 'Tinggi' ? 'selected' : ''}>${t('priority_high')}</option>
+                        </select>
+                    </div>
+                `;
+            } else {
+                priorityDisplay = getPriorityBadge(k.priority);
+            }
             
-            const musicPlayer = `
-                <div class="flex items-center gap-2">
-                    <select id="music-select" onchange="setMusic(this.value)" class="rounded-lg border-main bg-card text-main focus:ring-primary focus:border-primary text-sm p-1">
-                        ${musicTracks.map(track => `<option value="${track.id}" ${state.currentMusicTrack === track.id ? 'selected' : ''}>${t(track.name)}</option>`).join('')}
-                    </select>
-                    <button id="music-btn" onclick="toggleMusic()" class="text-muted hover:text-primary text-xl ${state.currentMusicTrack === 'none' ? 'hidden' : ''}">
-                        <i class="fas ${state.isMusicPlaying ? 'fa-pause-circle' : 'fa-play-circle'}"></i>
-                    </button>
-                </div>
-            `;
-
-            return MainLayout(`
+             return MainLayout(`
                 <div>
-                    <button onclick="backToDashboard()" class="mb-4 text-primary font-semibold hover:underline">
+                    <button onclick="window.backToDashboard()" class="mb-4 text-primary font-semibold hover:underline">
                         <i class="fas fa-arrow-left mr-2"></i>${t('back_to_dashboard')}
                     </button>
                     <div class="bg-card rounded-2xl shadow-xl overflow-hidden">
@@ -516,28 +556,33 @@
                                 <p class="text-sm text-muted">${t('topic')}: ${translatedCategory}</p>
                             </div>
                             <div class="flex items-center gap-4">
-                                ${musicPlayer}
-                                ${isKonselor && state.currentUser.name === k.konselorName ? `<select id="status-select" onchange="updateStatus(${k.id})" class="rounded-lg border-main bg-card text-main focus:ring-primary focus:border-primary text-sm"><option value="Baru" ${k.status === 'Baru' ? 'selected' : ''}>${t('status_new')}</option><option value="Dalam Proses" ${k.status === 'Dalam Proses' ? 'selected' : ''}>${t('status_in_progress')}</option><option value="Selesai" ${k.status === 'Selesai' ? 'selected' : ''}>${t('status_done')}</option></select>` : getStatusBadge(k.status)}
+                                ${priorityDisplay}
+                                ${isCounselor || isAdmin ? `<select onchange="window.updateStatus('${k.id}', this.value)" class="rounded-lg border-main bg-card text-main focus:ring-primary focus:border-primary text-sm">
+                                    <option value="Baru" ${k.status === 'Baru' ? 'selected' : ''}>${t('status_new')}</option>
+                                    <option value="Dalam Proses" ${k.status === 'Dalam Proses' ? 'selected' : ''}>${t('status_in_progress')}</option>
+                                    <option value="Selesai" ${k.status === 'Selesai' ? 'selected' : ''}>${t('status_done')}</option>
+                                </select>` : getStatusBadge(k.status)}
                             </div>
                         </div>
                         <div class="p-4 border-b border-main"><h4 class="font-semibold mb-2 text-main">${t('initial_problem_desc')}</h4><p class="text-sm bg-yellow-50 text-yellow-900 p-3 rounded-lg">${k.deskripsi}</p></div>
-                        <div id="chat-box" class="p-4 h-96 overflow-y-auto space-y-4 flex flex-col">${chatBubbles}</div>
-                        <div class="p-4 border-t border-main"><form onsubmit="sendMessage(event, ${k.id})"><div class="flex items-center gap-2"><input id="chat-input" type="text" class="w-full px-4 py-2 border border-main rounded-full focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('type_your_message')}"><button type="submit" class="bg-primary text-on-primary rounded-full p-3 hover:bg-primary-dark transition"><i class="fas fa-paper-plane"></i></button></div></form></div>
+                        <div id="chat-box" class="p-4 h-96 overflow-y-auto space-y-4 flex flex-col">${(k.chatHistory || []).map(chat => `<div class="chat ${chat.sender === (state.currentUser.fullName || state.currentUser.name) ? 'chat-end' : 'chat-start'}"><div class="chat-header text-xs text-muted mb-1">${chat.sender}</div><div class="chat-bubble ${chat.sender === (state.currentUser.fullName || state.currentUser.name) ? 'bubble-sent' : 'bubble-received'}">${chat.text}</div></div>`).join('')}</div>
+                        ${isAdmin ? '' : `<div class="p-4 border-t border-main"><form onsubmit="window.sendMessage(event, '${k.id}')"><div class="flex items-center gap-2"><input id="chat-input" type="text" class="w-full px-4 py-2 border border-main rounded-full focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('type_your_message')}"><button type="submit" class="bg-primary text-on-primary rounded-full p-3 hover:bg-primary-dark transition"><i class="fas fa-paper-plane"></i></button></div></form></div>`}
                     </div>
-                </div>`);
+                </div>
+            `);
         }
-
-        function ModalWrapper() {
+        
+        function ModalWrapper() { 
             return `<div id="modal-container" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop"><div id="modal-content" class="bg-card rounded-2xl shadow-2xl w-full max-w-lg relative fade-in"></div></div>`;
         }
 
         function FormKonsultasiModal() {
             return `
-                <button onclick="closeModal()" class="absolute top-4 right-4 text-muted hover:text-main"><i class="fas fa-times fa-lg"></i></button>
-                <form onsubmit="submitKonsultasi(event)" class="p-8">
+                <button onclick="window.closeModal()" class="absolute top-4 right-4 text-muted hover:text-main"><i class="fas fa-times fa-lg"></i></button>
+                <form onsubmit="window.submitKonsultasi(event)" class="p-8">
                     <h2 class="text-2xl font-bold mb-6 text-center text-main">${t('consultation_form_title')}</h2>
                     <div class="space-y-4">
-                        <div><label for="kelas" class="block text-sm font-medium text-main">${t('class')}</label><input id="kelas" type="text" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('class_placeholder')}"></div>
+                        <div><label for="kelas" class="block text-sm font-medium text-main">${t('class')}</label><input id="kelas" type="text" value="${state.currentUser.kelas || ''}" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main" placeholder="${t('class_placeholder')}"></div>
                         <div><label for="kategori" class="block text-sm font-medium text-main">${t('problem_category')}</label><select id="kategori" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main"><option value="">${t('select_category')}</option><option value="Akademik">${t('category_academic')}</option><option value="Karir">${t('category_career')}</option><option value="Pribadi/Sosial">${t('category_pribadi_sosial')}</option><option value="Lainnya">${t('category_lainnya')}</option></select></div>
                         <div>
                             <label for="konselor" class="block text-sm font-medium text-main">${t('choose_counselor')}</label>
@@ -551,13 +596,49 @@
                     </div>
                 </form>`;
         }
+        
+        function ChangePasswordModal() {
+            return `
+                <button onclick="window.closeModal()" class="absolute top-4 right-4 text-muted hover:text-main"><i class="fas fa-times fa-lg"></i></button>
+                <form onsubmit="window.changePassword(event)" class="p-8">
+                    <h2 class="text-2xl font-bold mb-6 text-center text-main">${t('change_password')}</h2>
+                    <div class="space-y-4">
+                        <div><label for="current-password" class="block text-sm font-medium text-main">${t('current_password')}</label><input id="current-password" type="password" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main"></div>
+                        <div><label for="new-password" class="block text-sm font-medium text-main">${t('new_password')}</label><input id="new-password" type="password" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main"></div>
+                        <div><label for="confirm-password" class="block text-sm font-medium text-main">${t('confirm_new_password')}</label><input id="confirm-password" type="password" required class="w-full px-4 py-2 mt-1 border border-main rounded-lg focus:ring-primary focus:border-primary bg-card text-main"></div>
+                        <div class="pt-4"><button type="submit" class="w-full py-3 px-4 bg-primary text-on-primary font-semibold rounded-lg shadow-md hover:bg-primary-dark">${t('change_password')}</button></div>
+                    </div>
+                    <p id="password-error" class="text-red-500 text-sm text-center mt-4"></p>
+                </form>
+            `;
+        }
 
+        function ConfirmationModal(message) {
+            return `
+                <div class="p-8 text-center">
+                    <i class="fas fa-exclamation-triangle text-4xl text-yellow-400 mb-4"></i>
+                    <h3 class="text-lg font-semibold text-main mb-2">${t('confirm_action')}</h3>
+                    <p class="text-main mb-6">${message}</p>
+                    <div class="flex justify-center gap-4">
+                        <button id="confirm-no-btn" onclick="window.closeModal()" class="px-6 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-main font-semibold">${t('no_cancel')}</button>
+                        <button id="confirm-yes-btn" class="px-6 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold">${t('yes_continue')}</button>
+                    </div>
+                </div>
+            `;
+        }
+        
         // === CONTROLLERS / LOGIC ===
-        function render() {
-            const app = document.getElementById('app');
-            document.title = `${t('app_title')} - ${t('school_name')}`;
 
-            switch(state.currentView) {
+        function render() {
+             const app = document.getElementById('app');
+             document.title = `${t('app_title')} - SMAN 1 Dramaga`;
+
+             if (!state.isAuthReady && state.currentView !== 'role_selection' && !state.currentView.startsWith('login')) {
+                // Can show a global loader here
+                return;
+             }
+
+             switch(state.currentView) {
                 case 'role_selection': app.innerHTML = RoleSelectionView(); break;
                 case 'login_siswa': app.innerHTML = LoginSiswaView(); break;
                 case 'login_konselor': app.innerHTML = LoginKonselorView(); break;
@@ -566,34 +647,429 @@
                 case 'dashboard_konselor': app.innerHTML = DashboardKonselorView(); break;
                 case 'dashboard_admin': app.innerHTML = DashboardAdminView(); break;
                 case 'chat':
-                    app.innerHTML = ChatView();
-                    setTimeout(() => { const chatBox = document.getElementById('chat-box'); if(chatBox) chatBox.scrollTop = chatBox.scrollHeight; }, 0);
+                    const k = state.konsultasiData.find(c => c.id === state.selectedKonsultasi);
+                    if (k) {
+                        app.innerHTML = ChatView(k);
+                        setTimeout(() => { const chatBox = document.getElementById('chat-box'); if(chatBox) chatBox.scrollTop = chatBox.scrollHeight; }, 0);
+                    } else {
+                        backToDashboard();
+                    }
                     break;
                 default: app.innerHTML = RoleSelectionView();
             }
         }
         
-        function navigateTo(view) {
-            state.currentView = view;
+        function showNotification() {
+            const message = state.hasNewNotification ? t('new_updates') : t('no_new_updates');
+            showToast(message);
+            if (state.hasNewNotification) {
+                state.hasNewNotification = false;
+                render();
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast-notification');
+            toast.textContent = message;
+            toast.classList.remove('hidden', 'bg-green-500', 'bg-red-500');
+            toast.classList.add(type === 'success' ? 'bg-green-500' : 'bg-red-500');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+        async function login(event, role) {
+            event.preventDefault();
+            const errorEl = document.getElementById('login-error');
+            errorEl.textContent = '';
+            
+            if (role === 'siswa') {
+                const nameInput = document.getElementById('name');
+                const passwordInput = document.getElementById('student-password');
+                const username = nameInput.value.trim();
+                const password = passwordInput.value;
+                if (!username || !password) { errorEl.textContent = t('username_required'); return; }
+
+                const student = state.students.find(s => s.username === username);
+                if (student && student.password === password) {
+                    state.currentUser = { ...student, role: 'siswa' };
+                    state.currentView = 'dashboard_siswa';
+                } else {
+                    errorEl.textContent = t('password_incorrect'); return;
+                }
+            } else if (role === 'konselor') {
+                const nameSelect = document.getElementById('counselor-select-login');
+                const passwordInput = document.getElementById('counselor-password');
+                const name = nameSelect.value;
+                const password = passwordInput.value;
+                 if (!name) { errorEl.textContent = t('name_required'); return; }
+
+                const counselor = state.counselors.find(c => c.name === name);
+                if (counselor && counselor.password === password) {
+                    state.currentUser = { ...counselor, role: 'konselor' };
+                    state.currentView = 'dashboard_konselor';
+                } else {
+                    errorEl.textContent = t('password_incorrect'); return;
+                }
+            } else if (role === 'admin') {
+                const usernameInput = document.getElementById('admin-username');
+                const passwordInput = document.getElementById('admin-password');
+                const username = usernameInput.value.trim();
+                const password = passwordInput.value;
+                if (!username) { errorEl.textContent = t('username_required'); return; }
+                if (username.toLowerCase() !== 'admin' || password !== 'admin123') {
+                    errorEl.textContent = t('password_incorrect'); return;
+                }
+                state.currentUser = { name: 'Admin', role: 'admin' };
+                state.currentView = 'dashboard_admin';
+            }
+            setupRealtimeListeners();
             render();
         }
         
-        function setTheme(themeName) {
-            const theme = themes[themeName];
-            if (!theme) return;
-            for (const [key, value] of Object.entries(theme.vars)) {
-                document.documentElement.style.setProperty(key, value);
+        async function changePassword(event) {
+            event.preventDefault();
+            const errorEl = document.getElementById('password-error');
+            errorEl.textContent = '';
+            const currentPassword = document.getElementById('current-password').value;
+            const newPassword = document.getElementById('new-password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+            
+            if (!newPassword || newPassword.length < 6) {
+                errorEl.textContent = 'Kata sandi baru minimal 6 karakter.'; return;
             }
-            state.currentTheme = themeName;
+            if (newPassword !== confirmPassword) {
+                errorEl.textContent = t('passwords_do_not_match'); return;
+            }
+            if (state.currentUser.password !== currentPassword) {
+                errorEl.textContent = t('password_incorrect'); return;
+            }
+            
+            try {
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                const studentRef = doc(db, "artifacts", appId, "public/data/students", state.currentUser.id);
+                await updateDoc(studentRef, { password: newPassword });
+                
+                showToast(t('password_changed_success'));
+                closeModal();
+            } catch (error) {
+                console.error("Error changing password: ", error);
+                errorEl.textContent = 'Gagal mengubah kata sandi.';
+            }
+        }
+        
+        async function updatePriority(konsultasiId, newPriority) {
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const docRef = doc(db, "artifacts", appId, "public/data/konsultasi", konsultasiId);
+            await updateDoc(docRef, { priority: newPriority });
+        }
+
+        async function addCounselor(event) {
+            event.preventDefault();
+            const nameInput = document.getElementById('counselor-name');
+            const specialtyInput = document.getElementById('counselor-specialty');
+            const passwordInput = document.getElementById('counselor-password');
+            const newCounselor = {
+                name: nameInput.value.trim(),
+                specialty: specialtyInput.value.trim(),
+                password: passwordInput.value.trim(),
+                createdAt: serverTimestamp()
+            };
+            if (!newCounselor.name || !newCounselor.specialty || !newCounselor.password) return;
+            try {
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                const colRef = collection(db, "artifacts", appId, "public/data/counselors");
+                await addDoc(colRef, newCounselor);
+                nameInput.value = '';
+                specialtyInput.value = '';
+                passwordInput.value = '';
+                showToast('Konselor berhasil ditambahkan!');
+            } catch(error) {
+                console.error("Error adding counselor:", error);
+                showToast('Gagal menambahkan konselor.', 'error');
+            }
+        }
+        
+        async function addStudent(event) {
+            event.preventDefault();
+            const fullNameInput = document.getElementById('student-fullname');
+            const usernameInput = document.getElementById('student-username');
+            const passwordInput = document.getElementById('student-initial-password');
+            const classInput = document.getElementById('student-class');
+            
+            const newStudent = {
+                fullName: fullNameInput.value.trim(),
+                username: usernameInput.value.trim(),
+                password: passwordInput.value.trim(),
+                kelas: classInput.value.trim(),
+            };
+
+            if (!newStudent.fullName || !newStudent.username || !newStudent.password || !newStudent.kelas) {
+                showToast('Semua kolom harus diisi.', 'error');
+                return;
+            }
+
+            try {
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                const colRef = collection(db, "artifacts", appId, "public/data/students");
+                await addDoc(colRef, newStudent);
+                fullNameInput.value = '';
+                usernameInput.value = '';
+                passwordInput.value = '';
+                classInput.value = '';
+                showToast('Siswa berhasil ditambahkan!');
+            } catch(error) {
+                console.error("Error adding student:", error);
+                showToast('Gagal menambahkan siswa.', 'error');
+            }
+        }
+        
+        async function deleteStudent(studentId, studentName) {
+            window.openModal('confirm', {
+                message: `Anda yakin ingin menghapus akun siswa "${studentName}"? Tindakan ini tidak dapat diurungkan.`,
+                onConfirm: async () => {
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    const docRef = doc(db, "artifacts", appId, "public/data/students", studentId);
+                    try {
+                        await deleteDoc(docRef);
+                        showToast(`Akun ${studentName} berhasil dihapus.`);
+                    } catch (e) {
+                        showToast(`Gagal menghapus akun.`, 'error');
+                    }
+                }
+            });
+        }
+        
+        async function resetStudentPassword(studentId, studentName) {
+            window.openModal('confirm', {
+                message: `Anda yakin ingin mereset kata sandi untuk "${studentName}"? Kata sandi baru akan menjadi 'ganti123'.`,
+                onConfirm: async () => {
+                    const newPassword = 'ganti123';
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    const docRef = doc(db, "artifacts", appId, "public/data/students", studentId);
+                    try {
+                        await updateDoc(docRef, { password: newPassword });
+                        showToast(`Kata sandi untuk ${studentName} direset menjadi "${newPassword}".`);
+                    } catch (e) {
+                        showToast(`Gagal mereset kata sandi.`, 'error');
+                    }
+                }
+            });
+        }
+
+        async function resetCounselorPassword(counselorId, counselorName) {
+            window.openModal('confirm', {
+                message: `Anda yakin ingin mereset kata sandi untuk "${counselorName}"? Kata sandi baru akan menjadi 'guru123'.`,
+                onConfirm: async () => {
+                    const newPassword = 'guru123';
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    const docRef = doc(db, "artifacts", appId, "public/data/counselors", counselorId);
+                    try {
+                        await updateDoc(docRef, { password: newPassword });
+                        showToast(`Kata sandi untuk ${counselorName} direset menjadi "${newPassword}".`);
+                    } catch (e) {
+                        showToast(`Gagal mereset kata sandi.`, 'error');
+                    }
+                }
+            });
+        }
+        
+        async function deleteCounselor(counselorId, counselorName) {
+            window.openModal('confirm', {
+                message: `Anda yakin ingin menghapus konselor "${counselorName}"?`,
+                onConfirm: async () => {
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    const docRef = doc(db, "artifacts", appId, "public/data/counselors", counselorId);
+                    try {
+                        await deleteDoc(docRef);
+                        showToast(`Konselor ${counselorName} berhasil dihapus.`);
+                    } catch (e) {
+                        showToast(`Gagal menghapus konselor.`, 'error');
+                    }
+                }
+            });
+        }
+
+        async function submitKonsultasi(event) {
+            event.preventDefault();
+            const newKonsultasi = {
+                siswaName: state.currentUser.fullName,
+                kelas: document.getElementById('kelas').value,
+                kategori: document.getElementById('kategori').value,
+                konselorName: document.getElementById('konselor').value,
+                deskripsi: document.getElementById('deskripsi').value,
+                status: 'Baru',
+                priority: 'Normal',
+                createdAt: serverTimestamp(),
+                chatHistory: [ { 
+                    sender: state.currentUser.fullName, 
+                    text: `[MASALAH AWAL] ${document.getElementById('deskripsi').value}`,
+                    timestamp: new Date()
+                } ],
+                lastUpdate: serverTimestamp()
+            };
+            try {
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                const colRef = collection(db, "artifacts", appId, "public/data/konsultasi");
+                await addDoc(colRef, newKonsultasi);
+                closeModal();
+            } catch (error) {
+                console.error("Error adding document: ", error);
+                showToast('Gagal mengirim pengajuan.', 'error');
+            }
+        }
+        
+        async function sendMessage(event, konsultasiId) {
+            event.preventDefault();
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (text) {
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                const docRef = doc(db, "artifacts", appId, "public/data/konsultasi", konsultasiId);
+                await updateDoc(docRef, {
+                    chatHistory: arrayUnion({
+                        sender: state.currentUser.fullName || state.currentUser.name,
+                        text: text,
+                        timestamp: new Date()
+                    }),
+                    lastUpdate: serverTimestamp()
+                });
+                input.value = '';
+            }
+        }
+
+        async function updateStatus(konsultasiId, newStatus) {
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const docRef = doc(db, "artifacts", appId, "public/data/konsultasi", konsultasiId);
+            await updateDoc(docRef, { status: newStatus });
+        }
+
+
+        function setupRealtimeListeners() {
+            if (unsubscribeConsultations) unsubscribeConsultations();
+            if (!state.currentUser) return;
+            
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const colRef = collection(db, "artifacts", appId, "public/data/konsultasi");
+            
+            let q;
+            if (state.currentUser.role === 'siswa') {
+                q = query(colRef, where("siswaName", "==", state.currentUser.fullName));
+            } else if (state.currentUser.role === 'konselor') {
+                q = query(colRef, where("konselorName", "==", state.currentUser.name));
+            } else if (state.currentUser.role === 'admin') {
+                q = query(colRef, orderBy("createdAt", "desc"));
+            } else { return; }
+
+            unsubscribeConsultations = onSnapshot(q, (snapshot) => {
+                const isInitialLoad = state.konsultasiData.length === 0;
+                let consultations = [];
+                snapshot.forEach(doc => {
+                    consultations.push({ ...doc.data(), id: doc.id });
+                });
+                
+                if (state.currentUser.role !== 'admin') {
+                    consultations.sort((a, b) => (b.lastUpdate?.seconds || 0) - (a.lastUpdate?.seconds || 0));
+                }
+
+                if (!isInitialLoad && consultations.length > state.konsultasiData.length) {
+                    state.hasNewNotification = true;
+                } else if (!isInitialLoad && consultations.length > 0) {
+                    const latestRemote = consultations[0];
+                    const latestLocal = state.konsultasiData.find(c => c.id === latestRemote.id);
+                    if (latestRemote && latestLocal && ((latestRemote.chatHistory || []).length > (latestLocal.chatHistory || []).length)) {
+                        state.hasNewNotification = true;
+                    }
+                }
+
+                state.konsultasiData = consultations;
+                render();
+            }, (error) => console.error("Error listening: ", error));
+        }
+
+        async function initFirebase() {
+            try {
+                const firebaseConfig = JSON.parse(window.__firebase_config || '{}');
+                if (!firebaseConfig.apiKey) { throw new Error("Firebase config not found."); }
+                
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (!user) {
+                        try {
+                            const initialToken = window.__initial_auth_token;
+                            if (initialToken) { await signInWithCustomToken(auth, initialToken); } 
+                            else { await signInAnonymously(auth); }
+                        } catch (error) { console.error("Auth failed:", error); }
+                    }
+                    state.isAuthReady = true;
+                    
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    
+                    const counselorsColRef = collection(db, "artifacts", appId, "public/data/counselors");
+                    unsubscribeCounselors = onSnapshot(query(counselorsColRef, orderBy("name")), (snapshot) => {
+                        state.counselors = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                        if(state.currentView === 'login_konselor' || state.currentView.startsWith('dashboard')) render();
+                    });
+
+                    const studentsColRef = collection(db, "artifacts", appId, "public/data/students");
+                    unsubscribeStudents = onSnapshot(query(studentsColRef, orderBy("fullName")), snapshot => {
+                        state.students = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                         if(state.currentView === 'dashboard_admin') render();
+                    });
+                    
+                    render();
+                });
+            } catch (error) {
+                console.error("Firebase init failed:", error);
+                document.getElementById('app').innerHTML = `<div class="p-4 text-red-600 bg-red-100">Error: Gagal menginisialisasi database.</div>`;
+            }
+        }
+        
+        function logout() {
+            if(unsubscribeConsultations) unsubscribeConsultations();
+            state.currentUser = null;
+            state.currentView = 'role_selection';
             render();
         }
 
-        function setLanguage(lang) {
-            state.currentLang = lang;
-            document.documentElement.lang = lang;
+        function openChat(konsultasiId) {
+            state.selectedKonsultasi = konsultasiId;
+            state.currentView = 'chat';
             render();
         }
 
+        function backToDashboard() {
+            state.selectedKonsultasi = null;
+            state.currentView = `dashboard_${state.currentUser.role}`;
+            render();
+        }
+
+        function openModal(modalType, options = {}) {
+            const modalContainer = document.getElementById('modal-container');
+            const modalContent = document.getElementById('modal-content');
+            if (modalType === 'changePassword') {
+                modalContent.innerHTML = ChangePasswordModal();
+            } else if (modalType === 'formKonsultasi') {
+                modalContent.innerHTML = FormKonsultasiModal();
+            } else if (modalType === 'confirm') {
+                modalContent.innerHTML = ConfirmationModal(options.message);
+                document.getElementById('confirm-yes-btn').onclick = () => {
+                    options.onConfirm();
+                    closeModal();
+                };
+            }
+            modalContainer.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            const modalContainer = document.getElementById('modal-container');
+            modalContainer.classList.add('hidden');
+            document.getElementById('modal-content').innerHTML = '';
+        }
+        
         function togglePasswordVisibility(inputId, iconId) {
             const passwordInput = document.getElementById(inputId);
             const icon = document.getElementById(iconId);
@@ -608,178 +1084,54 @@
             }
         }
 
-        function login(event, role) {
-            event.preventDefault();
-            const errorEl = document.getElementById('login-error');
-            errorEl.textContent = '';
-            let name = '';
-
-            if (role === 'siswa') {
-                const nameInput = document.getElementById('name');
-                const passwordInput = document.getElementById('student-password');
-                name = nameInput.value.trim();
-                const password = passwordInput.value;
-
-                if (!name) { errorEl.textContent = t('name_required'); return; }
-                if (password !== '111') { errorEl.textContent = t('password_incorrect'); return; }
-            } else if (role === 'konselor') {
-                const nameSelect = document.getElementById('counselor-select-login');
-                const passwordInput = document.getElementById('counselor-password');
-                name = nameSelect.value;
-                const password = passwordInput.value;
-                if (!name) { errorEl.textContent = t('name_required'); return; }
-                if (password !== '123') { errorEl.textContent = t('password_incorrect'); return; }
-            } else if (role === 'admin') {
-                const usernameInput = document.getElementById('admin-username');
-                const passwordInput = document.getElementById('admin-password');
-                const username = usernameInput.value.trim();
-                const password = passwordInput.value;
-                if (!username) { errorEl.textContent = t('username_required'); return; }
-                if (username.toLowerCase() !== 'admin' || password !== 'admin123') {
-                    errorEl.textContent = t('password_incorrect');
-                    return;
-                }
-                name = 'Admin';
+        function setTheme(themeName) {
+            const theme = themes[themeName];
+            if (!theme) return;
+            for (const [key, value] of Object.entries(theme.vars)) {
+                document.documentElement.style.setProperty(key, value);
             }
-            
-            state.currentUser = { name, role };
-            state.currentView = `dashboard_${role}`;
+            state.currentTheme = themeName;
+        }
+
+        function setLanguage(lang) {
+            state.currentLang = lang;
             render();
         }
         
-        function addCounselor(event) {
-            event.preventDefault();
-            const nameInput = document.getElementById('counselor-name');
-            const specialtyInput = document.getElementById('counselor-specialty');
-            const newName = nameInput.value.trim();
-            const newSpecialty = specialtyInput.value.trim();
-
-            if(newName && newSpecialty) {
-                state.counselors.push({
-                    id: Date.now(),
-                    name: newName,
-                    specialty: newSpecialty
-                });
-                nameInput.value = '';
-                specialtyInput.value = '';
-                render();
-            }
-        }
-        
-        function stopMusic() {
-            const music = document.getElementById('counseling-music');
-            music.pause();
-            music.currentTime = 0;
-            state.isMusicPlaying = false;
-            state.currentMusicTrack = 'none';
-        }
-
-        function logout() {
-            stopMusic();
-            state.currentUser = null;
-            state.currentView = 'role_selection';
-            render();
-        }
-        
-        function openChat(konsultasiId) {
-            state.selectedKonsultasi = state.konsultasiData.find(k => k.id === konsultasiId);
-            if (state.currentUser.role === 'konselor' && state.selectedKonsultasi.konselorName === state.currentUser.name && state.selectedKonsultasi.status === 'Baru') {
-                state.selectedKonsultasi.status = 'Dalam Proses';
-            }
-            state.currentView = 'chat';
-            render();
-        }
-        
-        function backToDashboard() {
-            stopMusic();
-            state.selectedKonsultasi = null;
-            state.currentView = `dashboard_${state.currentUser.role}`;
+        function navigateTo(view) {
+            state.currentView = view;
             render();
         }
 
-        function sendMessage(event, konsultasiId) {
-            event.preventDefault();
-            const input = document.getElementById('chat-input');
-            const text = input.value.trim();
-            if (text) {
-                const konsultasi = state.konsultasiData.find(k => k.id === konsultasiId);
-                if (state.currentUser.name === konsultasi.siswaName || state.currentUser.name === konsultasi.konselorName) {
-                    konsultasi.chatHistory.push({ sender: state.currentUser.name, text: text });
-                    input.value = '';
-                    render();
-                }
-            }
-        }
-        
-        function updateStatus(konsultasiId) {
-            const select = document.getElementById('status-select');
-            const newStatus = select.value;
-            const konsultasi = state.konsultasiData.find(k => k.id === konsultasiId);
-            konsultasi.status = newStatus;
-        }
-
-        function setMusic(trackId) {
-            state.currentMusicTrack = trackId;
-            const music = document.getElementById('counseling-music');
-            const selectedTrack = musicTracks.find(t => t.id === trackId);
-            
-            if (selectedTrack && selectedTrack.src) {
-                music.src = selectedTrack.src;
-                if (state.isMusicPlaying) {
-                    music.play();
-                }
-            } else {
-                music.pause();
-                music.src = '';
-                state.isMusicPlaying = false;
-            }
-            render();
-        }
-        
-        function toggleMusic() {
-            if (state.currentMusicTrack === 'none') return;
-            const music = document.getElementById('counseling-music');
-            state.isMusicPlaying = !state.isMusicPlaying;
-            if (state.isMusicPlaying) { music.play(); } else { music.pause(); }
-            render(); 
-        }
-
-        function openModal(modalType) {
-            const modalContainer = document.getElementById('modal-container');
-            const modalContent = document.getElementById('modal-content');
-            if(modalType === 'formKonsultasi') { modalContent.innerHTML = FormKonsultasiModal(); }
-            modalContainer.classList.remove('hidden');
-        }
-
-        function closeModal() {
-            const modalContainer = document.getElementById('modal-container');
-            modalContainer.classList.add('hidden');
-            document.getElementById('modal-content').innerHTML = '';
-        }
-        
-        function submitKonsultasi(event) {
-            event.preventDefault();
-            const newKonsultasi = {
-                id: Date.now(),
-                siswaName: state.currentUser.name,
-                kelas: document.getElementById('kelas').value,
-                kategori: document.getElementById('kategori').value,
-                konselorName: document.getElementById('konselor').value,
-                deskripsi: document.getElementById('deskripsi').value,
-                status: 'Baru',
-                chatHistory: [ { sender: state.currentUser.name, text: document.getElementById('deskripsi').value } ]
-            };
-            state.konsultasiData.unshift(newKonsultasi);
-            closeModal();
-            render();
-        }
-
-        // === INITIALIZATION ===
         document.addEventListener('DOMContentLoaded', () => {
+             // Attach functions to window object
+            window.setTheme = setTheme;
+            window.setLanguage = setLanguage;
+            window.navigateTo = navigateTo;
+            window.login = login;
+            window.logout = logout;
+            window.openChat = openChat;
+            window.backToDashboard = backToDashboard;
+            window.sendMessage = sendMessage;
+            window.updateStatus = updateStatus;
+            window.openModal = openModal;
+            window.closeModal = closeModal;
+            window.submitKonsultasi = submitKonsultasi;
+            window.addCounselor = addCounselor;
+            window.addStudent = addStudent;
+            window.deleteStudent = deleteStudent;
+            window.resetStudentPassword = resetStudentPassword;
+            window.resetCounselorPassword = resetCounselorPassword;
+            window.deleteCounselor = deleteCounselor;
+            window.togglePasswordVisibility = togglePasswordVisibility;
+            window.showNotification = showNotification;
+            window.changePassword = changePassword;
+            window.updatePriority = updatePriority;
+
+            initFirebase();
             setTheme(state.currentTheme); 
             render();
         });
-
     </script>
 </body>
 </html>

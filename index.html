@@ -389,7 +389,7 @@
                     <div class="lg:col-span-2 bg-card p-6 rounded-lg shadow">
                         <h3 class="text-lg font-semibold text-main mb-4">${t('all_consultations')}</h3>
                         <div class="space-y-4 max-h-[85vh] overflow-y-auto">
-                            ${state.konsultasiData.length > 0 ? state.konsultasiData.map(KonsultasiCard).join('') : `<p class="text-muted">${t('no_consultation_yet')}</p>`}
+                            ${state.konsultasiData.map(KonsultasiCard).join('') || `<p class="text-muted">${t('no_consultation_yet')}</p>`}
                         </div>
                     </div>
                 </div>
@@ -678,7 +678,7 @@
             }, 3000);
         }
 
-        async function login(event, role) {
+        function login(event, role) {
             event.preventDefault();
             const errorEl = document.getElementById('login-error');
             errorEl.textContent = '';
@@ -989,13 +989,12 @@
 
         async function initFirebase() {
             try {
-                console.log("Attempting to initialize Firebase...");
-                const firebaseConfig = JSON.parse(window.__firebase_config || '{}');
-                if (!firebaseConfig.apiKey) { 
-                    console.error("Firebase config not found or is invalid.");
-                    throw new Error("Firebase config not found."); 
+                const firebaseConfigStr = window.__firebase_config;
+                if (!firebaseConfigStr) {
+                    throw new Error("Firebase config not found.");
                 }
-                console.log("Firebase config loaded successfully.");
+                const firebaseConfig = JSON.parse(firebaseConfigStr);
+                if (!firebaseConfig.apiKey) { throw new Error("Firebase config is invalid."); }
                 
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
@@ -1029,7 +1028,7 @@
                 });
             } catch (error) {
                 console.error("Firebase init failed:", error);
-                document.getElementById('app').innerHTML = `<div class="p-4 text-red-600 bg-red-100">Error: Gagal menginisialisasi database.</div>`;
+                document.getElementById('app').innerHTML = `<div class="p-4 text-red-600 bg-red-100">Error: Gagal menginisialisasi database. Pastikan konfigurasi benar.</div>`;
             }
         }
         
